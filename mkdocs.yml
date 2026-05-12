@@ -62,7 +62,7 @@ plugins:
   - search:
       lang: en
 watch:
-  - netbox_assets_management_plugin
+  - assets_management_plugin
 extra:
   social:
     - icon: fontawesome/brands/twitter

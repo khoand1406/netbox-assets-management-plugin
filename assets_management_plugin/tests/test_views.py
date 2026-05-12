@@ -22,20 +22,20 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
     def setUp(self):
         """Set up each test."""
         super().setUp()
-        self.base_url = 'plugins:netbox_assets_management_plugin:assetsmanagement'
+        self.base_url = 'plugins:assets_management_plugin:assetsmanagement'
 
     def test_list_assetsmanagements(self):
         """Test Assetsmanagement list view."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_list')
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_list')
         response = self.client.get(url)
 
         self.assertHttpStatus(response, 200)
 
     def test_list_assetsmanagements_without_permission(self):
         """Test Assetsmanagement list view without permission."""
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_list')
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_list')
 
         with disable_warnings('django.request'):
             response = self.client.get(url)
@@ -43,10 +43,10 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
 
     def test_view_assetsmanagement(self):
         """Test Assetsmanagement detail view."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         instance = Assetsmanagement.objects.first()
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement', kwargs={'pk': instance.pk})
+        url = reverse('plugins:assets_management_plugin:assetsmanagement', kwargs={'pk': instance.pk})
         response = self.client.get(url)
 
         self.assertHttpStatus(response, 200)
@@ -55,11 +55,11 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
     def test_create_assetsmanagement(self):
         """Test creating a Assetsmanagement via form."""
         self.add_permissions(
-            'netbox_assets_management_plugin.add_assetsmanagement',
-            'netbox_assets_management_plugin.view_assetsmanagement'
+            'assets_management_plugin.add_assetsmanagement',
+            'assets_management_plugin.view_assetsmanagement'
         )
 
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_add')
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_add')
         name = f'Created {get_random_string(10)}'
 
         form_data = self.post_data({
@@ -75,7 +75,7 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
 
     def test_create_assetsmanagement_without_permission(self):
         """Test creating a Assetsmanagement without permission."""
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_add')
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_add')
 
         with disable_warnings('django.request'):
             response = self.client.get(url)
@@ -84,12 +84,12 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
     def test_edit_assetsmanagement(self):
         """Test editing a Assetsmanagement via form."""
         self.add_permissions(
-            'netbox_assets_management_plugin.change_assetsmanagement',
-            'netbox_assets_management_plugin.view_assetsmanagement'
+            'assets_management_plugin.change_assetsmanagement',
+            'assets_management_plugin.view_assetsmanagement'
         )
 
         instance = Assetsmanagement.objects.first()
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_edit', kwargs={'pk': instance.pk})
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_edit', kwargs={'pk': instance.pk})
 
         new_name = f'Edited {get_random_string(10)}'
         form_data = self.post_data({
@@ -106,12 +106,12 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
     def test_delete_assetsmanagement(self):
         """Test deleting a Assetsmanagement."""
         self.add_permissions(
-            'netbox_assets_management_plugin.delete_assetsmanagement',
-            'netbox_assets_management_plugin.view_assetsmanagement'
+            'assets_management_plugin.delete_assetsmanagement',
+            'assets_management_plugin.view_assetsmanagement'
         )
 
         instance = Assetsmanagement.objects.first()
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_delete', kwargs={'pk': instance.pk})
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_delete', kwargs={'pk': instance.pk})
 
         # Confirm deletion
         response = self.client.post(url, {'confirm': True}, follow=True)
@@ -125,7 +125,7 @@ class AssetsmanagementViewTestCase(PluginViewTestCase):
     def test_delete_assetsmanagement_without_permission(self):
         """Test deleting a Assetsmanagement without permission."""
         instance = Assetsmanagement.objects.first()
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_delete', kwargs={'pk': instance.pk})
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_delete', kwargs={'pk': instance.pk})
 
         with disable_warnings('django.request'):
             response = self.client.get(url)
@@ -139,13 +139,13 @@ class AssetsmanagementFormTestCase(PluginViewTestCase):
         """Set up each test."""
         super().setUp()
         self.add_permissions(
-            'netbox_assets_management_plugin.add_assetsmanagement',
-            'netbox_assets_management_plugin.view_assetsmanagement'
+            'assets_management_plugin.add_assetsmanagement',
+            'assets_management_plugin.view_assetsmanagement'
         )
 
     def test_form_validation_empty_name(self):
         """Test form validation with empty name."""
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_add')
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_add')
         form_data = self.post_data({'name': ''})
 
         response = self.client.post(url, form_data)
@@ -158,7 +158,7 @@ class AssetsmanagementFormTestCase(PluginViewTestCase):
         """Test form validation with duplicate name."""
         Assetsmanagement.objects.create(name='Duplicate')
 
-        url = reverse('plugins:netbox_assets_management_plugin:assetsmanagement_add')
+        url = reverse('plugins:assets_management_plugin:assetsmanagement_add')
         form_data = self.post_data({'name': 'Duplicate'})
 
         response = self.client.post(url, form_data)

@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('dcim', '0227_alter_interface_speed_bigint'),
         ('extras', '0134_owner'),
-        ('netbox_assets_management_plugin', '0002_assetgroup_created_by_and_more'),
+        ('assets_management_plugin', '0002_assetgroup_created_by_and_more'),
     ]
 
     operations = [
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 ('purchase_date', models.DateField(blank=True, null=True)),
                 ('warranty_period_months', models.PositiveIntegerField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(1)])),
                 ('warranty_expiration_date', models.DateField(blank=True, editable=False, null=True)),
-                ('asset_group', models.ForeignKey(limit_choices_to={'status': 'active'}, on_delete=django.db.models.deletion.PROTECT, related_name='assets', to='netbox_assets_management_plugin.assetgroup')),
+                ('asset_group', models.ForeignKey(limit_choices_to={'status': 'active'}, on_delete=django.db.models.deletion.PROTECT, related_name='assets', to='assets_management_plugin.assetgroup')),
                 ('location', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='assets', to='dcim.location')),
                 ('region', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='assets', to='dcim.region')),
                 ('site', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='assets', to='dcim.site')),

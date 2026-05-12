@@ -47,7 +47,7 @@ No additional Python packages are required beyond NetBox's core dependencies.
 
 This plugin provides a REST API endpoint for managing assets-management resources:
 
-- `/api/plugins/netbox_assets_management_plugin/assets-managements/` - List and create Assetsmanagement objects
+- `/api/plugins/assets_management_plugin/assets-managements/` - List and create Assetsmanagement objects
 
 
 ## GraphQL
@@ -77,11 +77,11 @@ Enable the plugin in `/opt/netbox/netbox/netbox/configuration.py`,
 
 ```python
 PLUGINS = [
-    'netbox_assets_management_plugin'
+    'assets_management_plugin'
 ]
 
 PLUGINS_CONFIG = {
-    "netbox_assets_management_plugin": {},
+    "assets_management_plugin": {},
 }
 ```
 

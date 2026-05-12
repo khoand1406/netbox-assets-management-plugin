@@ -17,7 +17,7 @@ class AssetsmanagementGraphQLTestCase(PluginGraphQLTestCase):
 
     def test_query_assetsmanagement(self):
         """Test GraphQL query for a single Assetsmanagement."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         instance = Assetsmanagement.objects.first()
 
@@ -38,7 +38,7 @@ class AssetsmanagementGraphQLTestCase(PluginGraphQLTestCase):
 
     def test_query_assetsmanagement_list(self):
         """Test GraphQL query for list of Assetsmanagements."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         query = """
         query {
@@ -59,7 +59,7 @@ class AssetsmanagementGraphQLTestCase(PluginGraphQLTestCase):
 
     def test_query_assetsmanagement_with_all_fields(self):
         """Test GraphQL query with all available fields."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         instance = Assetsmanagement.objects.first()
 

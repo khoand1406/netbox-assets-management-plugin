@@ -19,12 +19,12 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
     def setUp(self):
         """Set up each test."""
         super().setUp()
-        self.list_url_name = 'plugins-api:netbox_assets_management_plugin-api:assetsmanagement-list'
-        self.detail_url_name = 'plugins-api:netbox_assets_management_plugin-api:assetsmanagement-detail'
+        self.list_url_name = 'plugins-api:assets_management_plugin-api:assetsmanagement-list'
+        self.detail_url_name = 'plugins-api:assets_management_plugin-api:assetsmanagement-detail'
 
     def test_list_assetsmanagements(self):
         """Test GET request to list Assetsmanagements."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         url = self._get_list_url()
         response = self.client.get(url)
@@ -43,7 +43,7 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
 
     def test_get_assetsmanagement(self):
         """Test GET request for a single Assetsmanagement."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         instance = Assetsmanagement.objects.first()
         url = self._get_detail_url(instance)
@@ -55,7 +55,7 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
 
     def test_create_assetsmanagement(self):
         """Test POST request to create a Assetsmanagement."""
-        self.add_permissions('netbox_assets_management_plugin.add_assetsmanagement')
+        self.add_permissions('assets_management_plugin.add_assetsmanagement')
 
         url = self._get_list_url()
         name = f'API Created {get_random_string(10)}'
@@ -82,7 +82,7 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
 
     def test_bulk_create_assetsmanagements(self):
         """Test bulk creation via API."""
-        self.add_permissions('netbox_assets_management_plugin.add_assetsmanagement')
+        self.add_permissions('assets_management_plugin.add_assetsmanagement')
 
         url = self._get_list_url()
         data = [
@@ -101,7 +101,7 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
 
     def test_update_assetsmanagement(self):
         """Test PATCH request to update a Assetsmanagement."""
-        self.add_permissions('netbox_assets_management_plugin.change_assetsmanagement')
+        self.add_permissions('assets_management_plugin.change_assetsmanagement')
 
         instance = Assetsmanagement.objects.first()
         url = self._get_detail_url(instance)
@@ -127,7 +127,7 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
 
     def test_delete_assetsmanagement(self):
         """Test DELETE request to remove a Assetsmanagement."""
-        self.add_permissions('netbox_assets_management_plugin.delete_assetsmanagement')
+        self.add_permissions('assets_management_plugin.delete_assetsmanagement')
 
         instance = Assetsmanagement.objects.first()
         url = self._get_detail_url(instance)
@@ -151,7 +151,7 @@ class AssetsmanagementAPITestCase(PluginAPITestCase):
 
     def test_options_assetsmanagement(self):
         """Test OPTIONS request for list endpoint."""
-        self.add_permissions('netbox_assets_management_plugin.view_assetsmanagement')
+        self.add_permissions('assets_management_plugin.view_assetsmanagement')
 
         url = self._get_list_url()
         response = self.client.options(url)
@@ -165,8 +165,8 @@ class AssetsmanagementAPIValidationTestCase(PluginAPITestCase):
     def setUp(self):
         """Set up each test."""
         super().setUp()
-        self.add_permissions('netbox_assets_management_plugin.add_assetsmanagement')
-        self.list_url_name = 'plugins-api:netbox_assets_management_plugin-api:assetsmanagement-list'
+        self.add_permissions('assets_management_plugin.add_assetsmanagement')
+        self.list_url_name = 'plugins-api:assets_management_plugin-api:assetsmanagement-list'
 
     def test_create_with_empty_name(self):
         """Test that API validates empty name."""

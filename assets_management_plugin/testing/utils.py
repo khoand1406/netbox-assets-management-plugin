@@ -49,7 +49,7 @@ def create_test_user(username: str | None = None, permissions: list[str | None] 
 
     Example:
         >>> user = create_test_user(
-        ...     permissions=['netbox_assets_management_plugin.view_assetsmanagement']
+        ...     permissions=['assets_management_plugin.view_assetsmanagement']
         ... )
     """
     if username is None:

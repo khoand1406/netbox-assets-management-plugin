@@ -5,7 +5,7 @@ This configuration is used when running tests and should not be used in producti
 
 Usage:
     export NETBOX_CONFIGURATION=testing.configuration
-    python manage.py test netbox_assets_management_plugin.tests
+    python manage.py test assets_management_plugin.tests
 """
 
 import os
@@ -53,11 +53,11 @@ DEBUG = True
 
 # Plugin configuration
 PLUGINS = [
-    'netbox_assets_management_plugin',
+    'assets_management_plugin',
 ]
 
 PLUGINS_CONFIG = {
-    'netbox_assets_management_plugin': {
+    'assets_management_plugin': {
         # Add any plugin configuration needed for testing
     },
 }
@@ -84,7 +84,7 @@ LOGGING = {
             'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
             'propagate': False,
         },
-        'netbox_assets_management_plugin': {
+        'assets_management_plugin': {
             'handlers': ['console'],
             'level': 'DEBUG',
         },

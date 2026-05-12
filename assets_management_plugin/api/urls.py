@@ -12,7 +12,7 @@ from netbox.api.routers import NetBoxRouter
 
 from .views import AssetGroupViewSet, AssetViewSet
 
-app_name = "netbox_assets_management_plugin"
+app_name = "assets_management_plugin"
 
 router = NetBoxRouter()
 router.register(

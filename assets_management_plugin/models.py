@@ -24,7 +24,7 @@ class Assetsmanagement(NetBoxModel):
     name = models.CharField(max_length=100, unique=True)
 
     class Meta:
-        app_label = "netbox_assets_management_plugin"
+        app_label = "assets_management_plugin"
         ordering = ("name",)
         verbose_name_plural = "Assets Groups"
 
@@ -90,7 +90,7 @@ class AssetGroup(ImageAttachmentsMixin, NetBoxModel):
 
     def get_absolute_url(self):
         return reverse(
-        "plugins:netbox_assets_management_plugin:assetgroup",
+        "plugins:assets_management_plugin:assetgroup",
         args=[self.pk]
     )
 
@@ -232,7 +232,7 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
 
     def get_absolute_url(self):
         return reverse(
-            "plugins:netbox_assets_management_plugin:asset",
+            "plugins:assets_management_plugin:asset",
             args=[self.pk]
         )
     

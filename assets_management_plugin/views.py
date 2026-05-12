@@ -26,6 +26,8 @@ from netbox.ui import panels
 from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.utils.html import escape
+from .bulk_edit_forms import AssetBulkEditForm, AssetGroupBulkEditForm
+from .bulk_import_forms import AssetCSVForm, AssetGroupCSVForm
 
 class AssetGroupView(GetRelatedModelsMixin, generic.ObjectView):
     queryset = models.AssetGroup.objects.all()
@@ -333,7 +335,7 @@ class AssetGroupBulkEditView(generic.BulkEditView):
     queryset= models.AssetGroup.objects.all()
     filterset = filtersets.AssetGroupFilterSet
     table = tables.AssetGroupTable
-    form = forms.AssetGroupBulkEditForm
+    form = AssetGroupBulkEditForm
 
 class AssetGroupBulkDeleteView(generic.BulkDeleteView):
     queryset= models.AssetGroup.objects.all()
@@ -342,7 +344,7 @@ class AssetGroupBulkDeleteView(generic.BulkDeleteView):
 
 class AssetGroupBulkImportView(generic.BulkImportView):
     queryset= models.AssetGroup.objects.all()
-    model_form= forms.AssetGroupCSVForm
+    model_form= AssetGroupCSVForm
     
 
 @register_model_view(models.AssetGroup, name="assets")
@@ -353,7 +355,7 @@ class AssestGroupAssetsListView(generic.ObjectChildrenView):
     
     tab= ViewTab(
         label="Assets",
-        permission="netbox_assets_management_plugin.view_asset",
+        permission="assets_management_plugin.view_asset",
         weight=500,
         hide_if_empty=False,
         badge= lambda obj: obj.assets.count()
@@ -660,7 +662,7 @@ class AssetBulkEditView(generic.BulkEditView):
     queryset = models.Asset.objects.all()
     filterset = filtersets.AssetFilterSet
     table = tables.AssetTable
-    form = forms.AssetBulkEditForm
+    form = AssetBulkEditForm
 
 class AssetBulkDeleteView(generic.BulkDeleteView):
     queryset= models.Asset.objects.all()
@@ -669,6 +671,6 @@ class AssetBulkDeleteView(generic.BulkDeleteView):
 
 class AssetBulkImportView(generic.BulkImportView):
     queryset = models.Asset.objects.all()
-    model_form = forms.AssetCSVForm
+    model_form = AssetCSVForm
     
     

@@ -1,4 +1,4 @@
-sources = netbox_assets_management_plugin
+sources = assets_management_plugin
 
 .PHONY: test format lint unittest pre-commit clean
 test: format lint unittest

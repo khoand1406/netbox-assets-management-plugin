@@ -15,22 +15,22 @@ menu = PluginMenu(
             'Management',                  # Tên nhóm 1
             (
                 PluginMenuItem(
-                    link='plugins:netbox_assets_management_plugin:assetgroup_list',
+                    link='plugins:assets_management_plugin:assetgroup_list',
                     link_text='Assess Groups',
-                    permissions=['plugins:netbox_assets_management_plugin:assetgroup_list'],
+                    permissions=['plugins:assets_management_plugin:assetgroup_list'],
                     buttons=(
                         PluginMenuButton(
-                            link='plugins:netbox_assets_management_plugin:assetgroup_add',
+                            link='plugins:assets_management_plugin:assetgroup_add',
                             title='Add Assess Group',
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['plugins:netbox_assets_management_plugin:assetgroup_add'],
+                            permissions=['plugins:assets_management_plugin:assetgroup_add'],
                         ),
                     )
                 ),
                 PluginMenuItem(
-                    link='plugins:netbox_assets_management_plugin:asset_list',
+                    link='plugins:assets_management_plugin:asset_list',
                     link_text='Assets',
-                    permissions=['plugins:netbox_assets_management_plugin:asset_list'],
+                    permissions=['plugins:assets_management_plugin:asset_list'],
                 ),
             ),
         ),

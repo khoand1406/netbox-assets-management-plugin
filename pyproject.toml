@@ -70,10 +70,10 @@ ignore = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["netbox_assets_management_plugin*"]
+include = ["assets_management_plugin*"]
 
 [tool.setuptools.package-data]
-netbox_assets_management_plugin = [
+assets_management_plugin = [
     "templates/**",
     "static/**",
     "locale/**/*.mo",

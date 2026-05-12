@@ -68,12 +68,12 @@ class PluginTestCase(DjangoTestCase):
 
         Args:
             *permissions: Permission names in format "app.action_model"
-                         e.g., "netbox_assets_management_plugin.add_assetsmanagement"
+                         e.g., "assets_management_plugin.add_assetsmanagement"
 
         Example:
             self.add_permissions(
-                "netbox_assets_management_plugin.view_assetsmanagement",
-                "netbox_assets_management_plugin.add_assetsmanagement",
+                "assets_management_plugin.view_assetsmanagement",
+                "assets_management_plugin.add_assetsmanagement",
             )
         """
         for name in permissions:
@@ -315,7 +315,7 @@ class PluginViewTestCase(PluginModelTestCase):
         Override this or set self.base_url in your test class.
 
         Returns:
-            Base URL string (e.g., "plugins:netbox_assets_management_plugin:assetsmanagement")
+            Base URL string (e.g., "plugins:assets_management_plugin:assetsmanagement")
         """
         if hasattr(self, 'base_url'):
             return self.base_url
