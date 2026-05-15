@@ -2,16 +2,20 @@
 
 from django import forms
 from dcim.models.sites import Location, Region, Site
+from extras.models.tags import Tag
 from netbox.forms.bulk_import import PrimaryModelImportForm
+from utilities.forms.fields.csv import CSVChoiceField
+from utilities.forms.fields.csv import CSVModelMultipleChoiceField
 from utilities.forms.fields.csv import CSVModelChoiceField
+from django.utils.translation import gettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
 from .choices import AssetStatusChoices, AssetsManagemnentChoice
 from .models import AssetGroup, Asset
 
 class AssetGroupCSVForm(PrimaryModelImportForm):
-    status = forms.ChoiceField(
+    status = CSVChoiceField(
         choices=AssetsManagemnentChoice,
         required=False,
-        initial=AssetsManagemnentChoice.STATUS_ACTIVE,
         label="Status"
     )
 
@@ -21,6 +25,15 @@ class AssetGroupCSVForm(PrimaryModelImportForm):
         help_text=(
             "Accepted values: true/false, yes/no, 1/0."
         ),
+    )
+    tags = CSVModelMultipleChoiceField(
+        queryset=Tag.objects.filter(
+            object_types=ContentType.objects.get_for_model(AssetGroup)
+        ) | Tag.objects.filter(object_types__isnull=True),  # tag không giới hạn model nào thì vẫn dùng được
+        to_field_name="name",
+        required=False,
+        label="Tags",
+        help_text=_("Comma-separated list of tag names"),
     )
 
     class Meta:
@@ -32,14 +45,6 @@ class AssetGroupCSVForm(PrimaryModelImportForm):
             "description",
             "excluded_from_visualization",
         )
-    def save(self, *args, **kwargs):
-        
-        obj = self.instance
-
-        if obj.pk is None and not obj.created_by and hasattr(self, "request"):
-            obj.created_by = self.request.user
-
-        return super().save(*args, **kwargs)
 
 class AssetCSVForm(PrimaryModelImportForm):
     model= Asset
@@ -72,12 +77,23 @@ class AssetCSVForm(PrimaryModelImportForm):
     )
 
     # Choice field
-    status = forms.ChoiceField(
+    status = CSVChoiceField(
         choices=AssetStatusChoices,
         required=False,
         initial=AssetStatusChoices.ACTIVE,
         label="Status"
     )
+    
+    tags = CSVModelMultipleChoiceField(
+        queryset=Tag.objects.filter(
+            object_types=ContentType.objects.get_for_model(Asset)
+        ) | Tag.objects.filter(object_types__isnull=True),  # tag không giới hạn model nào thì vẫn dùng được
+        to_field_name="name",
+        required=False,
+        label="Tags",
+        help_text=_("Comma-separated list of tag names"),
+    )
+
     class Meta:
         model = Asset
         fields = (
@@ -90,6 +106,7 @@ class AssetCSVForm(PrimaryModelImportForm):
             "model",
             "serial",
             "manufacturer",
+            "tags",
             "region",
             "site",
             "location",

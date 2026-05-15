@@ -30,11 +30,12 @@ class AssetGroupFilterSet(NetBoxModelFilterSet):
         label="Trạng thái"
     )
 
+    tag= TagFilter()
     
 
     class Meta:
         model = AssetGroup
-        fields = ("q", "name", "status")
+        fields = ("q", "name", "status", "tag")
 
     def search(self, queryset, name, value):
         if not value or not value.strip():
@@ -87,6 +88,7 @@ class AssetFilterSet(NetBoxModelFilterSet):
         lookup_expr="icontains",
         label="Loại thiết bị",
     )
+    tag= TagFilter()
 
     class Meta:
         model = Asset
@@ -98,6 +100,7 @@ class AssetFilterSet(NetBoxModelFilterSet):
             "asset_group_id",
             "manufacturer",
             "device_type",
+            "tag",
         )
     
 

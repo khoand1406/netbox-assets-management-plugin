@@ -8,8 +8,11 @@ from django import forms
 from dcim.models.sites import Location
 from dcim.models.sites import Region, Site
 from extras.models.models import ImageAttachment
+from extras.models.tags import Tag
 from netbox.forms import NetBoxModelForm
 from django.core.validators import FileExtensionValidator
+from utilities.forms.fields.dynamic import DynamicModelMultipleChoiceField
+from utilities.forms.fields.fields import TagFilterField
 from utilities.forms.fields import DynamicModelChoiceField
 from netbox.forms.filtersets import NetBoxModelFilterSetForm
 from utilities.forms.rendering import FieldSet
@@ -37,6 +40,7 @@ class AssetGroupForm(NetBoxModelForm):
             )
         ],
     )
+    
 
     class Meta:
         model = AssetGroup
@@ -47,6 +51,7 @@ class AssetGroupForm(NetBoxModelForm):
             "description",
             "excluded_from_visualization",
             "attachment",
+            
         )
 
         labels = {
@@ -109,6 +114,13 @@ class AssetGroupEditForm(NetBoxModelForm):
             )
         ],
     )
+    tags = DynamicModelMultipleChoiceField(
+        queryset=Tag.objects.filter(
+            object_types=ContentType.objects.get_for_model(AssetGroup)
+        ) | Tag.objects.filter(object_types__isnull=True),
+        required=False,
+        label="Tags",
+    )
 
     class Meta:
         model = AssetGroup
@@ -119,6 +131,7 @@ class AssetGroupEditForm(NetBoxModelForm):
             "description",
             "image_attachment",          
             "attachment",
+            "tags",
             "excluded_from_visualization",
         )
 
@@ -129,6 +142,7 @@ class AssetGroupEditForm(NetBoxModelForm):
             "description": "Description",
             "image_attachment": "Attachments",
             "attachment": "New Attachment",
+            "tags":"Tags",
             "excluded_from_visualization": "Exclude from Visualization",
         }
 
@@ -170,6 +184,7 @@ class AssetGroupEditForm(NetBoxModelForm):
             
             if images.exists():
                 self.fields["image_attachment"].initial = images.first()
+            self.fields["tags"].initial = self.instance.tags.all()
               
 class AssetGroupFilterForm(NetBoxModelFilterSetForm):
     model = AssetGroup
@@ -187,17 +202,18 @@ class AssetGroupFilterForm(NetBoxModelFilterSetForm):
         required=False,
         label="Trạng thái",
     )
+    tag= TagFilterField(model= AssetGroup)
 
     class Meta:
         model = AssetGroup
-        fields = ("q", "name", "status")
+        fields = ("q", "name", "status", "tag")
 
     fieldsets = (
         
         FieldSet("q"),
 
         
-        FieldSet("name", "status", name="Asset Group"),
+        FieldSet("name", "status", "tag", name="Asset Group"),
     )
     
 
@@ -263,6 +279,7 @@ class AssetFilterForm(NetBoxModelFilterSetForm):
             }
         )
     )
+    tag= TagFilterField(model=Asset)
 
     class Meta:
         model = Asset
@@ -285,7 +302,8 @@ class AssetFilterForm(NetBoxModelFilterSetForm):
             "location",
             "manufacturer",
             "device_type",
-            name="Bộ lọc tài sản",
+            "tag",
+            name="Asset Filter",
         ),
     )
     

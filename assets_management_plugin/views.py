@@ -10,7 +10,10 @@ https://docs.netbox.dev/en/stable/development/views/
 import logging
 from django.db import transaction, router
 from dateutil.relativedelta import relativedelta
+from django.core.exceptions import ValidationError
 from extras.models.models import ImageAttachment
+from extras.ui.panels import TagsPanel
+from netbox.views.generic.feature_views import ObjectImageAttachmentsView
 from utilities.exceptions import AbortRequest, PermissionsViolation
 from utilities.forms.utils import restrict_form_fields
 from utilities.views import GetRelatedModelsMixin
@@ -29,6 +32,16 @@ from django.utils.html import escape
 from .bulk_edit_forms import AssetBulkEditForm, AssetGroupBulkEditForm
 from .bulk_import_forms import AssetCSVForm, AssetGroupCSVForm
 
+def get_image_count(obj):
+    try:
+        # Use object_type_id to match NetBox's internal field schema
+        return ImageAttachment.objects.filter(
+            object_type_id=ContentType.objects.get_for_model(obj).id,
+            object_id=obj.pk
+        ).count()
+    except Exception:
+        return 0
+    
 class AssetGroupView(GetRelatedModelsMixin, generic.ObjectView):
     queryset = models.AssetGroup.objects.all()
     
@@ -36,6 +49,7 @@ class AssetGroupView(GetRelatedModelsMixin, generic.ObjectView):
         left_panels=[
             # Panel thông tin cơ bản
             AssetsGroupPanel(),
+            TagsPanel()
         ], 
         right_panels=[
             panels.RelatedObjectsPanel(),
@@ -50,6 +64,33 @@ class AssetGroupView(GetRelatedModelsMixin, generic.ObjectView):
                 omit=[],
             )
         }
+@register_model_view(model= models.AssetGroup, name="images", path="images")
+class AssetGroupImageView(ObjectImageAttachmentsView):
+    queryset= models.AssetGroup.objects.all()
+    child_model= ImageAttachment
+    template_name = 'generic/object_children.html'
+    tab = ViewTab(
+        label='Images',
+        badge=get_image_count,
+        weight=500
+    )
+    def get(self, request, *args, **kwargs):
+        kwargs['model'] = models.AssetGroup
+        return super().get(request, *args, **kwargs)
+    
+@register_model_view(model= models.Asset, name="images", path="images")
+class AssetImageView(ObjectImageAttachmentsView):
+    queryset= models.Asset.objects.all()
+    child_model= ImageAttachment
+    template_name = 'generic/object_children.html'
+    tab = ViewTab(
+        label='Images',
+        badge=get_image_count,
+        weight=500
+    )
+    def get(self, request, *args, **kwargs):
+        kwargs['model'] = models.Asset
+        return super().get(request, *args, **kwargs)
     
 class AssetGroupListView(generic.ObjectListView):
     
@@ -94,19 +135,19 @@ class AssetGroupCreateView(generic.ObjectEditView):
                         raise PermissionsViolation()
 
                 
-                uploaded_file = request.FILES.get('attachment')
-                if uploaded_file:
-                    try:
-                        content_type = ContentType.objects.get_for_model(obj)
-                        image = ImageAttachment(
-                            object_type=content_type,
-                            object_id=obj.pk,
-                            name=uploaded_file.name.rsplit('.', 1)[0],
+                    uploaded_file = request.FILES.get('attachment')
+                    if uploaded_file:
+                        try:
+                            content_type = ContentType.objects.get_for_model(obj)
+                            image = ImageAttachment(
+                                object_type=content_type,
+                                object_id=obj.pk,
+                                name=uploaded_file.name.rsplit('.', 1)[0],
                         )
-                        image.image.save(uploaded_file.name, uploaded_file, save=True)
-                        messages.success(request, f"Đã upload ảnh: {uploaded_file.name}")
-                    except Exception as e:
-                        messages.error(request, f"Lỗi upload: {str(e)}")
+                            image.image.save(uploaded_file.name, uploaded_file, save=True)
+                            messages.success(request, f"Uploaded File: {uploaded_file.name}")
+                        except Exception as e:
+                            raise ValidationError(f"Error while uploading file: {e}")
 
                 
                 msg = '{} {}'.format(
@@ -211,53 +252,41 @@ class AssetGroupEditView(generic.ObjectEditView):
                         raise PermissionsViolation()
 
                
-                uploaded_file = request.FILES.get("attachment")
-                selected_image = form.cleaned_data.get("image_attachment")
+                    uploaded_file = request.FILES.get("attachment")
+                    selected_image = form.cleaned_data.get("image_attachment")
 
-                if uploaded_file:
-                    try:
-                        
-                        if selected_image:
-                            image = selected_image
+                    if uploaded_file:
+                        try:
+                            if selected_image:
+                                image = selected_image
+                            else:
+                                content_type = ContentType.objects.get_for_model(obj)
+                                image = ImageAttachment(
+                                    object_type=content_type,
+                                    object_id=obj.pk,
+                                )
 
-                            
-                            if image.image:
-                                image.image.delete(save=False)
+                            image.name = uploaded_file.name.rsplit(".", 1)[0]
 
-                        
-                        else:
-                            content_type = ContentType.objects.get_for_model(obj)
-                            image = ImageAttachment(
-                                object_type=content_type,
-                                object_id=obj.pk,
+                            image.image.save(
+                                uploaded_file.name,
+                                uploaded_file,
+                                save=True,
                             )
 
-                        
-                        image.name = uploaded_file.name.rsplit(".", 1)[0]
+                            if selected_image:
+                                messages.success(
+                                    request,
+                                    f"Updated File Success: {uploaded_file.name}"
+                                )
+                            else:
+                                messages.success(
+                                    request,
+                                    f"Uploaded New File: {uploaded_file.name}"
+                                )
 
-                        
-                        image.image.save(
-                            uploaded_file.name,
-                            uploaded_file,
-                            save=True,
-                        )
-
-                        if selected_image:
-                            messages.success(
-                                request,
-                                f"Đã cập nhật ảnh: {uploaded_file.name}"
-                            )
-                        else:
-                            messages.success(
-                                request,
-                                f"Đã upload ảnh mới: {uploaded_file.name}"
-                            )
-
-                    except Exception as e:
-                        messages.error(
-                            request,
-                            f"Lỗi upload ảnh: {str(e)}"
-                        )
+                        except Exception as e:
+                            raise ValidationError(f"Error while uploading file: {e}")
 
                 
                 msg = "{} {}".format(
@@ -301,7 +330,7 @@ class AssetGroupEditView(generic.ObjectEditView):
 
                 return redirect(return_url)
 
-            except (AbortRequest, PermissionsViolation) as e:
+            except (AbortRequest, PermissionsViolation, ValidationError) as e:
                 error_message = getattr(e, "message", str(e))
                 logger.debug(error_message)
                 form.add_error(None, error_message)
@@ -328,8 +357,6 @@ class AssetGroupEditView(generic.ObjectEditView):
 class AssetGroupDeleteView(generic.ObjectDeleteView):
     queryset = models.AssetGroup.objects.all()
 
-class AssetGroupImagesView(generic.ObjectView):
-    queryset = models.AssetGroup.objects.all()
     
 class AssetGroupBulkEditView(generic.BulkEditView):
     queryset= models.AssetGroup.objects.all()
@@ -345,6 +372,14 @@ class AssetGroupBulkDeleteView(generic.BulkDeleteView):
 class AssetGroupBulkImportView(generic.BulkImportView):
     queryset= models.AssetGroup.objects.all()
     model_form= AssetGroupCSVForm
+    table = tables.AssetGroupTable
+    def save_object(self, object_form, request):
+        obj = object_form.save(commit=False)
+        if obj.pk is None and hasattr(obj, 'created_by'):
+            obj.created_by = request.user
+        obj.save()
+        object_form.save_m2m()
+        return obj
     
 
 @register_model_view(models.AssetGroup, name="assets")
@@ -374,7 +409,9 @@ class AssetView(GetRelatedModelsMixin,generic.ObjectView):
     queryset= models.Asset.objects.all()
     layout= layout.SimpleLayout(
         left_panels= [
-            AssetPanel()
+            AssetPanel(),
+            TagsPanel()
+            
         ], 
         right_panels= [
             panels.RelatedObjectsPanel(),
@@ -429,19 +466,19 @@ class AssetCreateView(generic.ObjectEditView):
                         raise PermissionsViolation()
 
                 
-                uploaded_file = request.FILES.get('attachment')
-                if uploaded_file:
-                    try:
-                        content_type = ContentType.objects.get_for_model(obj)
-                        image = ImageAttachment(
-                            object_type=content_type,
-                            object_id=obj.pk,
-                            name=uploaded_file.name.rsplit('.', 1)[0],
-                        )
-                        image.image.save(uploaded_file.name, uploaded_file, save=True)
-                        messages.success(request, f"Uploaded: {uploaded_file.name}")
-                    except Exception as e:
-                        messages.error(request, f"Error while upload: {str(e)}")
+                    uploaded_file = request.FILES.get('attachment')
+                    if uploaded_file:
+                        try:
+                            content_type = ContentType.objects.get_for_model(obj)
+                            image = ImageAttachment(
+                                object_type=content_type,
+                                object_id=obj.pk,
+                                name=uploaded_file.name.rsplit('.', 1)[0],
+                            )
+                            image.image.save(uploaded_file.name, uploaded_file, save=True)
+                            messages.success(request, f"Uploaded: {uploaded_file.name}")
+                        except Exception as e:
+                            raise ValidationError(f"Error while uploading file: {e}")
 
                 
                 msg = '{} {}'.format(
@@ -475,10 +512,10 @@ class AssetCreateView(generic.ObjectEditView):
 
                 return redirect(return_url)
 
-            except (AbortRequest, PermissionsViolation) as e:
+            except (AbortRequest, PermissionsViolation, ValidationError) as e:
                 logger.debug(e.message)
                 form.add_error(None, e.message)
-
+            
         else:
             logger.debug("Form validation failed")
 
@@ -537,58 +574,42 @@ class AssetEditView(generic.ObjectEditView):
                     object_created = form.instance.pk is None
                     obj = form.save()
 
-                    
                     if not self.queryset.filter(pk=obj.pk).exists():
                         raise PermissionsViolation()
 
-               
-                uploaded_file = request.FILES.get("attachment")
-                selected_image = form.cleaned_data.get("image_attachment")
+                    uploaded_file = request.FILES.get("attachment")
+                    selected_image = form.cleaned_data.get("image_attachment")
 
-                if uploaded_file:
-                    try:
-                        
-                        if selected_image:
-                            image = selected_image
-
-                            
-                            if image.image:
-                                image.image.delete(save=False)
-
-                        
-                        else:
-                            content_type = ContentType.objects.get_for_model(obj)
-                            image = ImageAttachment(
-                                object_type=content_type,
-                                object_id=obj.pk,
+                    if uploaded_file:
+                        try:
+                            if selected_image:
+                                image = selected_image
+                                
+                            else:
+                                content_type = ContentType.objects.get_for_model(obj)
+                                image = ImageAttachment(
+                                    object_type=content_type,
+                                    object_id=obj.pk,
                             )
-
-                        
-                        image.name = uploaded_file.name.rsplit(".", 1)[0]
-
-                        
-                        image.image.save(
-                            uploaded_file.name,
-                            uploaded_file,
-                            save=True,
-                        )
-
-                        if selected_image:
-                            messages.success(
+                            image.name = uploaded_file.name.rsplit(".", 1)[0]
+                            image.image.save(
+                                uploaded_file.name,
+                                uploaded_file,
+                                save=True,
+                            )
+                            if selected_image:
+                                messages.success(
                                 request,
-                                f"Đã cập nhật ảnh: {uploaded_file.name}"
+                                f"Updated Image Successfully: {uploaded_file.name}"
                             )
-                        else:
-                            messages.success(
+                            else:
+                                messages.success(
                                 request,
-                                f"Đã upload ảnh mới: {uploaded_file.name}"
+                                f"Upload new image successfully: {uploaded_file.name}"
                             )
 
-                    except Exception as e:
-                        messages.error(
-                            request,
-                            f"Lỗi upload ảnh: {str(e)}"
-                        )
+                        except Exception as e:
+                            raise ValidationError(f"Error while uploading file: {e}")
 
                 
                 msg = "{} {}".format(
@@ -632,7 +653,7 @@ class AssetEditView(generic.ObjectEditView):
 
                 return redirect(return_url)
 
-            except (AbortRequest, PermissionsViolation) as e:
+            except (AbortRequest, PermissionsViolation, ValidationError) as e:
                 error_message = getattr(e, "message", str(e))
                 logger.debug(error_message)
                 form.add_error(None, error_message)
@@ -672,5 +693,11 @@ class AssetBulkDeleteView(generic.BulkDeleteView):
 class AssetBulkImportView(generic.BulkImportView):
     queryset = models.Asset.objects.all()
     model_form = AssetCSVForm
-    
+    def save_object(self, object_form, request):
+        obj = object_form.save(commit=False)
+        if obj.pk is None and hasattr(obj, 'created_by'):
+            obj.created_by = request.user
+        obj.save()
+        object_form.save_m2m()
+        return obj
     

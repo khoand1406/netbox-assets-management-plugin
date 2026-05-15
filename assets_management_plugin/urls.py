@@ -89,5 +89,6 @@ urlpatterns = (
         name="asset_changelog",
         kwargs={"model": models.Asset},
     ),
-    
+    path("assets-managements/<int:pk>/images/", views.AssetGroupImageView.as_view(), name="assetgroup_image-attachments"),
+    path("assets-managements/assets/<int:pk>/images/", views.AssetImageView.as_view(), name="asset_image-attachments")
 )
