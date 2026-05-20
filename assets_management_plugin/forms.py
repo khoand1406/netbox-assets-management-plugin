@@ -17,9 +17,11 @@ from utilities.forms.fields import DynamicModelChoiceField
 from netbox.forms.filtersets import NetBoxModelFilterSetForm
 from utilities.forms.rendering import FieldSet
 from django.contrib.contenttypes.models import ContentType
+from django.utils.translation import gettext_lazy as _
 
 from .models import Asset, AssetGroup, Assetsmanagement
- 
+from .ui.widgets import CustomUploadWidget, MultipleFileField
+
 
 class AssetsmanagementForm(NetBoxModelForm):
     class Meta:
@@ -30,15 +32,18 @@ class AssetGroupForm(NetBoxModelForm):
     """
     Form thêm mới/chỉnh sửa Asset Group.
     """
-    attachment = forms.ImageField(
-        required=False,
-        label="Attachment",
-        help_text="Only jpg, jpeg, png allowed. Maximum size 25MB.",
+    attachment= MultipleFileField(
+        required= False,
+        label= _("Attachment"),
+        help_text=_("Only jpg, jpeg, png allowed. Maximum total size per file: 25MB."),
         validators=[
-            FileExtensionValidator(
-                allowed_extensions=["jpg", "jpeg", "png"]
-            )
+            FileExtensionValidator(["jpg", "jpeg", "png"])
         ],
+        widget=CustomUploadWidget(
+           attrs= {
+               "multiple": True
+           }
+        )
     )
     
 
@@ -50,69 +55,47 @@ class AssetGroupForm(NetBoxModelForm):
             "status",
             "description",
             "excluded_from_visualization",
-            "attachment",
-            
         )
 
-        labels = {
-            "name": "Name",
-            "code": "Code",
-            "status": "Status",
-            "description": "Description",
-            "exclude_from_visualization": "Exclude from Visualization",
-            "attachment": "Attachment",
-        }
-
-        help_texts = {
-            "name": "Allow up to 100 characters.",
-            "code": "Allow up to 50 characters. Unique value.",
-            "status": "Default is Active.",
-            "description": "Allow up to 500 characters.",
-            "exclude_from_visualization": (
-                "When selected, assets in this group will not be "
-                "included in the visualization."
-            ),
-            "attachment": "Only jpg, jpeg, png allowed. Maximum size 25MB.",
-        }
-
     def clean_attachment(self):
-        """
-        Kiểm tra dung lượng file upload tối đa 25MB.
-        """
-        file = self.cleaned_data.get("attachment")
+        files = self.files.getlist("attachment")
 
-        if file and file.size > 25 * 1024 * 1024:
-            raise forms.ValidationError(
-                "File size cannot exceed 25MB."
-            )
+        if not files:
+            return []
 
-        return file
+        allowed_extensions = {"jpg", "jpeg", "png"}
+        max_size = 25 * 1024 * 1024
+
+        for file in files:
+            
+            if file.size > max_size:
+                raise forms.ValidationError(
+                    f"File '{file.name}' exceeds 25MB."
+                )
+
+            
+            extension = file.name.rsplit(".", 1)[-1].lower()
+            if extension not in allowed_extensions:
+                raise forms.ValidationError(
+                    f"File '{file.name}' has unsupported extension."
+                )
+
+        return files
     
 class AssetGroupEditForm(NetBoxModelForm):
-    
-    image_attachment = forms.ModelChoiceField(
-        queryset=ImageAttachment.objects.none(),
-        required=False,
-        label="Attachments",
-        help_text=(
-            "Select an existing attachment to update. "
-            "Leave blank to create a new attachment."
-        ),
-    )
-
     # Upload ảnh mới
-    attachment = forms.ImageField(
-        required=False,
-        label="New Attachment",
-        help_text=(
-            "Upload a new attachment to replace the selected one. "
-            "Allowed file types: JPG, JPEG, PNG. Maximum size: 25MB."
-        ),
+    attachment= MultipleFileField(
+        required= False,
+        label= _("Attachment"),
+        help_text=_("Only jpg, jpeg, png allowed. Maximum total size per file: 25MB."),
         validators=[
-            FileExtensionValidator(
-                allowed_extensions=["jpg", "jpeg", "png"]
-            )
+            FileExtensionValidator(["jpg", "jpeg", "png"])
         ],
+        widget=CustomUploadWidget(
+           attrs= {
+               "multiple": True
+           }
+        )
     )
     tags = DynamicModelMultipleChoiceField(
         queryset=Tag.objects.filter(
@@ -129,225 +112,198 @@ class AssetGroupEditForm(NetBoxModelForm):
             "code",
             "status",
             "description",
-            "image_attachment",          
-            "attachment",
             "tags",
             "excluded_from_visualization",
         )
 
-        labels = {
-            "name": "Name",
-            "code": "Code",
-            "status": "Status",
-            "description": "Description",
-            "image_attachment": "Attachments",
-            "attachment": "New Attachment",
-            "tags":"Tags",
-            "excluded_from_visualization": "Exclude from Visualization",
-        }
-
-        help_texts = {
-            "name": "Allow up to 100 characters.",
-            "code": "Allow up to 50 characters. Unique value.",
-            "status": "Default is Active.",
-            "description": "Allow up to 500 characters.",
-            "excluded_from_visualization": (
-                "When selected, assets in this group will not be "
-                "included in the visualization."
-            ),
-            "attachment": "Upload a new attachment to replace the selected one. Allowed file types: JPG, JPEG, PNG. Maximum size: 25MB.",
-        }
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)    
+        self.fields["tags"].initial = self.instance.tags.all()
+    
+    def clean_attachment(self):
+        files = self.files.getlist("attachment")
 
-       
-        if self.instance and self.instance.pk:
-            content_type = ContentType.objects.get_for_model(self.instance)
+        if not files:
+            return []
 
-            images = ImageAttachment.objects.filter(
-                object_type=content_type,
-                object_id=self.instance.pk
-            ).order_by("-created")
+        allowed_extensions = {"jpg", "jpeg", "png"}
+        max_size = 25 * 1024 * 1024
 
+        for file in files:
             
-            self.fields["image_attachment"].queryset = images
-
-            
-            self.fields["image_attachment"].label_from_instance = (
-                lambda obj: (
-                    f"{obj.name or obj.image.name} "
-                    f"(ID: {obj.pk})"
+            if file.size > max_size:
+                raise forms.ValidationError(
+                    f"File '{file.name}' exceeds 25MB."
                 )
-            )
 
             
-            if images.exists():
-                self.fields["image_attachment"].initial = images.first()
-            self.fields["tags"].initial = self.instance.tags.all()
+            extension = file.name.rsplit(".", 1)[-1].lower()
+            if extension not in allowed_extensions:
+                raise forms.ValidationError(
+                    f"File '{file.name}' has unsupported extension."
+                )
+
+        return files
               
 class AssetGroupFilterForm(NetBoxModelFilterSetForm):
     model = AssetGroup
 
     name = forms.CharField(
         required=False,
-        label="Tên",
+        label=_("Name"),
         widget=forms.TextInput(
-            attrs={"placeholder": "Nhập tên nhóm"}
+            attrs={"placeholder": _("Enter group name")}
         )
     )
 
     status = forms.MultipleChoiceField(
         choices=AssetGroup._meta.get_field("status").choices,
         required=False,
-        label="Trạng thái",
+        label=_("Status"),
     )
-    tag= TagFilterField(model= AssetGroup)
 
-    class Meta:
-        model = AssetGroup
-        fields = ("q", "name", "status", "tag")
+    tag = TagFilterField(model=AssetGroup)
 
     fieldsets = (
-        
         FieldSet("q"),
-
-        
-        FieldSet("name", "status", "tag", name="Asset Group"),
+        FieldSet("name", "status", "tag", name=_("Asset Group")),
     )
-    
 
-    
-    
+
 class AssetFilterForm(NetBoxModelFilterSetForm):
     model = Asset
 
     q = forms.CharField(
         required=False,
-        label="Search",
+        label=_("Search"),
         widget=forms.TextInput(
             attrs={
-                "placeholder": "Search by name, code, description, manufacturer, or device type"
+                "placeholder": _("Search by name, code, description, manufacturer, or device type")
             }
         )
     )
 
     name = forms.CharField(
         required=False,
-        label="Name",
+        label=_("Name"),
         widget=forms.TextInput(
-            attrs={
-                "placeholder": "Enter asset name"
-            }
+            attrs={"placeholder": _("Enter asset name")}
         )
     )
 
     status = forms.MultipleChoiceField(
         required=False,
-        label="Status",
+        label=_("Status"),
         choices=Asset._meta.get_field("status").choices,
     )
 
-    location = forms.ModelChoiceField(
+    region = DynamicModelChoiceField(
+        queryset=Region.objects.all(),
         required=False,
-        label="Location",
-        queryset=Location.objects.all(),
+        label=_("Region"),
     )
 
-    asset_group = forms.ModelChoiceField(
+    site = DynamicModelChoiceField(
+        queryset=Site.objects.all(),
         required=False,
-        label="Asset Group",
+        label=_("Site"),
+        query_params={"region_id": "$region"},
+    )
+
+    location = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        required=False,
+        label=_("Location"),
+        query_params={"site_id": "$site"},
+    )
+
+    asset_group = DynamicModelChoiceField(
+        required=False,
+        label=_("Asset Group"),
         queryset=AssetGroup.objects.all(),
     )
 
     manufacturer = forms.CharField(
         required=False,
-        label="Manufacturer",
+        label=_("Manufacturer"),
         widget=forms.TextInput(
-            attrs={
-                "placeholder": "Enter manufacturer"
-            }
+            attrs={"placeholder": _("Enter manufacturer")}
         )
     )
 
     device_type = forms.CharField(
         required=False,
-        label="Device Type",
+        label=_("Device Type"),
         widget=forms.TextInput(
-            attrs={
-                "placeholder": "Enter device type"
-            }
+            attrs={"placeholder": _("Enter device type")}
         )
     )
-    tag= TagFilterField(model=Asset)
 
-    class Meta:
-        model = Asset
-        fields = (
-            "q",
-            "name",
-            "status",
-            "location",
-            "asset_group",
-            "manufacturer",
-            "device_type",
-        )
+    tag = TagFilterField(model=Asset)
 
     fieldsets = (
-        FieldSet("q", name="Tìm kiếm"),
+        FieldSet("q", name=_("Search")),
         FieldSet(
             "name",
             "status",
-            "asset_group",
+            "region",
+            "site",
             "location",
+            "asset_group",
             "manufacturer",
             "device_type",
             "tag",
-            name="Asset Filter",
+            name=_("Asset Filter"),
         ),
     )
     
 
 class AssetForm(NetBoxModelForm):
-    
-    attachment= forms.ImageField(
+
+    attachment = MultipleFileField(
         required=False,
-        label="Attachment",
-        help_text="Only jpg, jpeg, png allowed. Maximum size 25MB.",
+        label=_("New Attachment"),
+        help_text=_("Only jpg, jpeg, png allowed. Maximum total size per file: 25MB."),
         validators=[
             FileExtensionValidator(
                 allowed_extensions=["jpg", "jpeg", "png"]
             )
         ],
+        widget=CustomUploadWidget(
+            attrs={
+                "multiple": True
+            }
+        ),
     )
-    
-    region= DynamicModelChoiceField(
+
+    region = DynamicModelChoiceField(
         queryset=Region.objects.all(),
-        required= False,
-        label= "Region"
-        
+        required=False,
+        label=_("Region")
     )
-    
-    site= DynamicModelChoiceField(
+
+    site = DynamicModelChoiceField(
         queryset=Site.objects.all(),
-        required= False,
-        label="Site",
+        required=False,
+        label=_("Site"),
         query_params={
-            "region_id":"$region"
+            "region_id": "$region"
         }
     )
-    location= DynamicModelChoiceField(
-        queryset= Location.objects.all(),
-        required= False,
-        label= "Location",
+
+    location = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        required=False,
+        label=_("Location"),
         query_params={
-            "site_id":"$site"
+            "site_id": "$site"
         }
     )
-    
+
     installation_date = forms.DateField(
         required=False,
-        label="Installation Date",
+        label=_("Installation Date"),
         widget=forms.DateInput(
             attrs={
                 "type": "date",
@@ -358,7 +314,7 @@ class AssetForm(NetBoxModelForm):
 
     purchase_date = forms.DateField(
         required=False,
-        label="Purchase Date",
+        label=_("Purchase Date"),
         widget=forms.DateInput(
             attrs={
                 "type": "date",
@@ -369,7 +325,7 @@ class AssetForm(NetBoxModelForm):
 
     warranty_expiration_date = forms.DateField(
         required=False,
-        label="Warranty Expiration Date",
+        label=_("Warranty Expiration Date"),
         disabled=True,
         widget=forms.DateInput(
             attrs={
@@ -387,7 +343,6 @@ class AssetForm(NetBoxModelForm):
             "asset_group",
             "status",
             "description",
-            
             "device_type",
             "model",
             "serial",
@@ -395,7 +350,6 @@ class AssetForm(NetBoxModelForm):
             "installation_date",
             "purchase_date",
             "warranty_period_months",
-            
             "attachment",
             "region",
             "site",
@@ -404,38 +358,37 @@ class AssetForm(NetBoxModelForm):
         )
 
         labels = {
-            "name": "Name",
-            "code": "Code",
-            "asset_group": "Asset Group",
-            "status": "Status",
-            "description": "Description",
-            "device_type": "Device Type",
-            "model": "Model",
-            "serial": "Serial",
-            "manufacturer": "Manufacturer",
-            "installation_date": "Installation Date",
-            "purchase_date": "Purchase Date",
-            "warranty_period_months": "Warranty Period (months)",
-            "warranty_expiration_date": "Warranty Expiration Date",
-            "attachment": "Attachment",
-            "region": "Region",
-            "site": "Site",
-            "location": "Location",
+            "name": _("Name"),
+            "code": _("Code"),
+            "asset_group": _("Asset Group"),
+            "status": _("Status"),
+            "description": _("Description"),
+            "device_type": _("Device Type"),
+            "model": _("Model"),
+            "serial": _("Serial"),
+            "manufacturer": _("Manufacturer"),
+            "installation_date": _("Installation Date"),
+            "purchase_date": _("Purchase Date"),
+            "warranty_period_months": _("Warranty Period (months)"),
+            "warranty_expiration_date": _("Warranty Expiration Date"),
+            "attachment": _("Attachment"),
+            "region": _("Region"),
+            "site": _("Site"),
+            "location": _("Location"),
         }
 
         help_texts = {
-            "name": "Maximum 100 characters.",
-            "code": "Maximum 50 characters and must be unique.",
-            "description": "Maximum 500 characters.",
-            "attachment": "Only jpg, jpeg, png allowed. Maximum size 25MB.",
-            "device_type": "Maximum 100 characters.",
-            "warranty_period_months": "Enter a positive integer (unit: months).",
+            "name": _("Maximum 100 characters."),
+            "code": _("Maximum 50 characters and must be unique."),
+            "description": _("Maximum 500 characters."),
+            "attachment": _("Only jpg, jpeg, png allowed. Maximum size 25MB."),
+            "device_type": _("Maximum 100 characters."),
+            "warranty_period_months": _("Enter a positive integer (unit: months)."),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        
         self.fields["asset_group"].queryset = AssetGroup.objects.filter(
             status="active"
         )
@@ -443,194 +396,189 @@ class AssetForm(NetBoxModelForm):
             self.fields["warranty_expiration_date"].initial = (
                 self.instance.warranty_expiration_date
             )
-
 
     def clean_attachment(self):
-        """
-        Kiểm tra kích thước file tối đa 25MB.
-        """
-        file = self.cleaned_data.get("attachment")
-        if file and file.size > 25 * 1024 * 1024:
-            raise forms.ValidationError(
-                "File size cannot exceed 25MB."
-            )
-        return file
-    
-class AssetEditForm(NetBoxModelForm):
-    
-    image_attachment= forms.ModelChoiceField(
-        queryset=ImageAttachment.objects.none(),
-        required=False,
-        label="Attachments",
-        help_text=(
-            "Select an existing attachment to update. "
-            "Leave blank to create a new attachment."
-        ),
-    )
-    
-    attachment= forms.ImageField(
-        required=False,
-        label="New Attachment",
-        help_text="Only jpg, jpeg, png allowed. Maximum size 25MB.",
-        validators=[
-            FileExtensionValidator(
-                allowed_extensions=["jpg", "jpeg", "png"]
-            )
-        ],
-    )
-    
-    
-    region= DynamicModelChoiceField(
-        queryset=Region.objects.all(),
-        required= False,
-        label= "Region"
-        
-    )
-    
-    site= DynamicModelChoiceField(
-        queryset=Site.objects.all(),
-        required= False,
-        label="Site",
-        query_params={
-            "region_id":"$region"
-        }
-    )
-    location= DynamicModelChoiceField(
-        queryset= Location.objects.all(),
-        required= False,
-        label= "Location",
-        query_params={
-            "site_id":"$site"
-        }
-    )
-    
-    installation_date = forms.DateField(
-        required=False,
-        label="Installation Date",
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "placeholder": "DD/MM/YYYY",
-            }
-        ),
-    )
+        files = self.files.getlist("attachment")
 
-    purchase_date = forms.DateField(
-        required=False,
-        label="Purchase Date",
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "placeholder": "DD/MM/YYYY",
-            }
-        ),
-    )
+        if not files:
+            return []
 
-    warranty_expiration_date = forms.DateField(
-        required=False,
-        label="Warranty Expiration Date",
-        disabled=True,
-        widget=forms.DateInput(
-            attrs={
-                "type": "date",
-                "placeholder": "DD/MM/YYYY",
-            }
-        ),
-    )
+        allowed_extensions = {"jpg", "jpeg", "png"}
+        max_size = 25 * 1024 * 1024
 
-    class Meta:
-        model = Asset
-        fields = (
-            "name",
-            "code",
-            "asset_group",
-            "status",
-            "description",
-            
-            "device_type",
-            "model",
-            "serial",
-            "manufacturer",
-            "installation_date",
-            "purchase_date",
-            "warranty_period_months",
-            
-            "image_attachment",
-            "attachment",
-            "region",
-            "site",
-            "location",
-            "tags",
-        )
-
-        labels = {
-            "name": "Name",
-            "code": "Code",
-            "asset_group": "Asset Group",
-            "status": "Status",
-            "description": "Description",
-            "device_type": "Device Type",
-            "model": "Model",
-            "serial": "Serial",
-            "manufacturer": "Manufacturer",
-            "installation_date": "Installation Date",
-            "purchase_date": "Purchase Date",
-            "warranty_period_months": "Warranty Period (months)",
-            "warranty_expiration_date": "Warranty Expiration Date",
-            "image_attachment":"Attachments",
-            "attachment": "New Attachment",
-            "region": "Region",
-            "site": "Site",
-            "location": "Location",
-        }
-
-        help_texts = {
-            "name": "Maximum 100 characters.",
-            "code": "Maximum 50 characters and must be unique.",
-            "description": "Maximum 500 characters.",
-            "attachment": "Upload a new attachment to replace the selected one. Allowed file types: JPG, JPEG, PNG. Maximum size: 25MB.",
-            "device_type": "Maximum 100 characters.",
-            "warranty_period_months": "Enter a positive integer (unit: months).",
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        
-        self.fields["asset_group"].queryset = AssetGroup.objects.filter(
-            status="active"
-        )
-        if self.instance and self.instance.pk:
-            self.fields["warranty_expiration_date"].initial = (
-                self.instance.warranty_expiration_date
-            )
-            content_type= ContentType.objects.get_for_model(self.instance)
-            images = ImageAttachment.objects.filter(
-                object_type=content_type,
-                object_id=self.instance.pk
-            ).order_by("-created")
-            self.fields["image_attachment"].queryset = images
-
-            self.fields["image_attachment"].label_from_instance = (
-                lambda obj: (
-                    f"{obj.name or obj.image.name} "
-                    f"(ID: {obj.pk})"
+        for file in files:
+            if file.size > max_size:
+                raise forms.ValidationError(
+                    _("File '%(name)s' exceeds 25MB.") % {"name": file.name}
                 )
-            )
-            if images.exists():
-                self.fields["image_attachment"].initial = images.first()
+            extension = file.name.rsplit(".", 1)[-1].lower()
+            if extension not in allowed_extensions:
+                raise forms.ValidationError(
+                    _("File '%(name)s' has unsupported extension.") % {"name": file.name}
+                )
 
+        return files
+
+
+class AssetEditForm(NetBoxModelForm):
+
+    attachment = MultipleFileField(
+        required=False,
+        label=_("New Attachment"),
+        help_text=_("Only jpg, jpeg, png allowed. Maximum total size per file: 25MB."),
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=["jpg", "jpeg", "png"]
+            )
+        ],
+        widget=CustomUploadWidget(
+            attrs={
+                "multiple": True
+            }
+        ),
+    )
+
+    region = DynamicModelChoiceField(
+        queryset=Region.objects.all(),
+        required=False,
+        label=_("Region")
+    )
+
+    site = DynamicModelChoiceField(
+        queryset=Site.objects.all(),
+        required=False,
+        label=_("Site"),
+        query_params={
+            "region_id": "$region"
+        }
+    )
+
+    location = DynamicModelChoiceField(
+        queryset=Location.objects.all(),
+        required=False,
+        label=_("Location"),
+        query_params={
+            "site_id": "$site"
+        }
+    )
+
+    installation_date = forms.DateField(
+        required=False,
+        label=_("Installation Date"),
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "placeholder": "DD/MM/YYYY",
+            }
+        ),
+    )
+
+    purchase_date = forms.DateField(
+        required=False,
+        label=_("Purchase Date"),
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "placeholder": "DD/MM/YYYY",
+            }
+        ),
+    )
+
+    warranty_expiration_date = forms.DateField(
+        required=False,
+        label=_("Warranty Expiration Date"),
+        disabled=True,
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "placeholder": "DD/MM/YYYY",
+            }
+        ),
+    )
+
+    class Meta:
+        model = Asset
+        fields = (
+            "name",
+            "code",
+            "asset_group",
+            "status",
+            "description",
+            "device_type",
+            "model",
+            "serial",
+            "manufacturer",
+            "installation_date",
+            "purchase_date",
+            "warranty_period_months",
+            "region",
+            "site",
+            "location",
+            "tags",
+        )
+
+        labels = {
+            "name": _("Name"),
+            "code": _("Code"),
+            "asset_group": _("Asset Group"),
+            "status": _("Status"),
+            "description": _("Description"),
+            "device_type": _("Device Type"),
+            "model": _("Model"),
+            "serial": _("Serial"),
+            "manufacturer": _("Manufacturer"),
+            "installation_date": _("Installation Date"),
+            "purchase_date": _("Purchase Date"),
+            "warranty_period_months": _("Warranty Period (months)"),
+            "warranty_expiration_date": _("Warranty Expiration Date"),
+            "attachment": _("New Attachment"),
+            "region": _("Region"),
+            "site": _("Site"),
+            "location": _("Location"),
+        }
+
+        help_texts = {
+            "name": _("Maximum 100 characters."),
+            "code": _("Maximum 50 characters and must be unique."),
+            "description": _("Maximum 500 characters."),
+            "attachment": _("Upload a new attachment to replace the selected one. Allowed file types: JPG, JPEG, PNG. Maximum size: 25MB."),
+            "device_type": _("Maximum 100 characters."),
+            "warranty_period_months": _("Enter a positive integer (unit: months)."),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["asset_group"].queryset = AssetGroup.objects.filter(
+            status="active"
+        )
+        if self.instance and self.instance.pk:
+            self.fields["warranty_expiration_date"].initial = (
+                self.instance.warranty_expiration_date
+            )
+            
 
     def clean_attachment(self):
-        """
-        Kiểm tra kích thước file tối đa 25MB.
-        """
-        file = self.cleaned_data.get("attachment")
-        if file and file.size > 25 * 1024 * 1024:
-            raise forms.ValidationError(
-                "File size cannot exceed 25MB."
-            )
-        return file
+        files = self.files.getlist("attachment")
+
+        if not files:
+            return []
+
+        allowed_extensions = {"jpg", "jpeg", "png"}
+        max_size = 25 * 1024 * 1024
+
+        for file in files:
+            if file.size > max_size:
+                raise forms.ValidationError(
+                    _("File '%(name)s' exceeds 25MB.") % {"name": file.name}
+                )
+            extension = file.name.rsplit(".", 1)[-1].lower()
+            if extension not in allowed_extensions:
+                raise forms.ValidationError(
+                    _("File '%(name)s' has unsupported extension.") % {"name": file.name}
+                )
+
+        return files
     
     
 

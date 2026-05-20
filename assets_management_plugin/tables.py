@@ -12,114 +12,89 @@ import django_tables2 as tables
 from netbox.tables import NetBoxTable
 from netbox.tables import columns
 
-from .models import Asset, AssetGroup, Assetsmanagement
+from .models import Asset, AssetGroup
+from django.utils.translation import gettext_lazy as _
 
 
-
-        
 class AssetGroupTable(NetBoxTable):
-    """
-    Bảng hiển thị danh sách nhóm tài sản
-    """
     name = tables.Column(
         linkify=True,
-        verbose_name='Name'
+        verbose_name=_('Name')
     )
     code = tables.Column(
-        verbose_name='Code'
+        verbose_name=_('Code')
     )
     status = columns.ChoiceFieldColumn(
-        verbose_name='Status'
+        verbose_name=_('Status')
     )
     description = tables.Column(
-        verbose_name='Description',
+        verbose_name=_('Description'),
         orderable=False
     )
     created = columns.DateTimeColumn(
-        verbose_name='Created'
+        verbose_name=_('Created')
     )
     created_by = tables.Column(
-        verbose_name='Created By'
+        verbose_name=_('Created By')
     )
     last_updated = columns.DateTimeColumn(
-        verbose_name='Last Updated'
+        verbose_name=_('Last Updated')
     )
-    
+
     class Meta(NetBoxTable.Meta):
         model = AssetGroup
         fields = (
-            'pk', 'name', 'code', 'status', 'description', 
+            'pk', 'name', 'code', 'status', 'description',
             'created', 'created_by', 'last_updated', 'actions'
         )
         default_columns = (
-            'name', 'code', 'status', 'description', 
+            'name', 'code', 'status', 'description',
             'created', 'created_by', 'last_updated', 'actions'
         )
-        
-class AssetTable(NetBoxTable):
 
+
+class AssetTable(NetBoxTable):
     name = tables.Column(
         linkify=True,
-        verbose_name="Name"
+        verbose_name=_("Name")
     )
-
-    # Mã
     code = tables.Column(
-        verbose_name="Code"
+        verbose_name=_("Code")
     )
-
-    
     status = columns.ChoiceFieldColumn(
-        verbose_name="Status"
+        verbose_name=_("Status")
     )
-
-    
     site = tables.Column(
         linkify=True,
-        verbose_name="Site"
+        verbose_name=_("Site")
     )
-
-    
     location = tables.Column(
         linkify=True,
-        verbose_name="Location"
+        verbose_name=_("Location")
     )
-
-   
     asset_group = tables.Column(
         linkify=True,
-        verbose_name="Asset Group"
+        verbose_name=_("Asset Group")
     )
-
-    
     manufacturer = tables.Column(
-        verbose_name="Manufacturer"
+        verbose_name=_("Manufacturer")
     )
-
-    
     device_type = tables.Column(
-        verbose_name="Device Type"
+        verbose_name=_("Device Type")
     )
-
     created_by = tables.Column(
         linkify=True,
-        verbose_name="Created By"
+        verbose_name=_("Created By")
     )
-
-    
     created = columns.DateTimeColumn(
-        verbose_name="Created"
+        verbose_name=_("Created")
     )
-
-    
     last_updated = columns.DateTimeColumn(
-        verbose_name="Last Updated"
+        verbose_name=_("Last Updated")
     )
 
     class Meta(NetBoxTable.Meta):
         model = Asset
-
-        # Các cột mặc định hiển thị
         fields = (
             "pk",
             "id",
@@ -136,8 +111,6 @@ class AssetTable(NetBoxTable):
             "last_updated",
             "actions",
         )
-
-        # Các cột hiển thị mặc định khi mở màn hình
         default_columns = (
             "name",
             "code",
@@ -152,6 +125,4 @@ class AssetTable(NetBoxTable):
             "last_updated",
             "actions",
         )
-
-        # Sắp xếp mặc định: cập nhật mới nhất lên đầu tiên
         order_by = ("-last_updated",)

@@ -18,6 +18,7 @@ from netbox import settings
 from netbox.models.features import ImageAttachmentsMixin
 from .choices import AssetStatusChoices, AssetsManagemnentChoice
 from django.core.validators import MinValueValidator
+from django.utils.translation import gettext_lazy as _
 
 
 class Assetsmanagement(NetBoxModel):
@@ -41,29 +42,29 @@ class AssetGroup(ImageAttachmentsMixin, NetBoxModel):
 
     name = models.CharField(
         max_length=100,
-        verbose_name="Asset Group Name",
-        help_text="The name of the asset group."
+        verbose_name=_("Asset Group Name"),
+        help_text=_("The name of the asset group.")
     )
 
     code = models.CharField(
         max_length=50,
         unique=True,
-        verbose_name="Asset Group Code",
-        help_text="A unique identifier for the asset group."
+        verbose_name=_("Asset Group Code"),
+        help_text=_("A unique identifier for the asset group.")
     )
 
     status = models.CharField(
         max_length=20,
         choices=AssetsManagemnentChoice,
         default=AssetsManagemnentChoice.STATUS_ACTIVE,
-        verbose_name="Status",
-        help_text="The current status of the asset group."
+        verbose_name=_("Status"),
+        help_text=_("The current status of the asset group.")
     )
 
     description = models.TextField(
         blank=True,
-        verbose_name="Description",
-        help_text="Detailed description of the asset group."
+        verbose_name=_("Description"),
+        help_text=_("Detailed description of the asset group.")
     )
     
     created_by = models.ForeignKey(
@@ -75,14 +76,14 @@ class AssetGroup(ImageAttachmentsMixin, NetBoxModel):
     
     excluded_from_visualization= models.BooleanField(
         default=False,
-        verbose_name="Exclude from Visualization",
-        help_text="If enabled, this asset group will be excluded from visualizations and reports."
+        verbose_name=_("Exclude from Visualization"),
+        help_text=_("If enabled, this asset group will be excluded from visualizations and reports.")
     )
 
     class Meta:
         ordering = ("-last_updated",)
-        verbose_name = "Asset Group"
-        verbose_name_plural = "Asset Groups"
+        verbose_name = _("Asset Group")
+        verbose_name_plural = _("Asset Groups")
 
     
     def __str__(self):
@@ -103,19 +104,18 @@ class AssetGroup(ImageAttachmentsMixin, NetBoxModel):
             "secondary"
         )
         
-class Asset(ImageAttachmentsMixin, NetBoxModel):
-    
+class Asset(NetBoxModel):
 
     name = models.CharField(
         max_length=100,
         unique=True,
-        verbose_name="Name"
+        verbose_name=_("Name")
     )
 
     code = models.CharField(
         max_length=50,
         unique=True,
-        verbose_name="Code"
+        verbose_name=_("Code")
     )
 
     asset_group = models.ForeignKey(
@@ -123,46 +123,46 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
         on_delete=models.PROTECT,
         related_name="assets",
         limit_choices_to={"status": "active"},
-        verbose_name="Asset Group"
+        verbose_name=_("Asset Group")
     )
 
     status = models.CharField(
         max_length=30,
         choices=AssetStatusChoices,
         default=AssetStatusChoices.ACTIVE,
-        verbose_name="Status"
+        verbose_name=_("Status")
     )
 
     description = models.TextField(
         max_length=500,
         blank=True,
-        verbose_name="Description"
+        verbose_name=_("Description")
     )
 
     device_type = models.CharField(
         max_length=100,
-        verbose_name="Device Type"
+        verbose_name=_("Device Type")
     )
 
     model = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name="Model"
+        verbose_name=_("Model")
     )
 
     serial = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name="Serial"
+        verbose_name=_("Serial")
     )
 
     manufacturer = models.CharField(
         max_length=100,
         blank=True,
-        verbose_name="Manufacturer"
+        verbose_name=_("Manufacturer")
     )
-    
-    created_by= models.ForeignKey(
+
+    created_by = models.ForeignKey(
         to=settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         blank=True,
@@ -172,27 +172,27 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
     installation_date = models.DateField(
         blank=True,
         null=True,
-        verbose_name="Installation Date"
+        verbose_name=_("Installation Date")
     )
 
     purchase_date = models.DateField(
         blank=True,
         null=True,
-        verbose_name="Purchase Date"
+        verbose_name=_("Purchase Date")
     )
 
     warranty_period_months = models.PositiveIntegerField(
         blank=True,
         null=True,
         validators=[MinValueValidator(1)],
-        verbose_name="Warranty Period (months)"
+        verbose_name=_("Warranty Period (months)")
     )
 
     warranty_expiration_date = models.DateField(
         blank=True,
         null=True,
         editable=False,
-        verbose_name="Warranty Expiration Date"
+        verbose_name=_("Warranty Expiration Date")
     )
 
     region = models.ForeignKey(
@@ -201,7 +201,7 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
         related_name="assets",
         blank=True,
         null=True,
-        verbose_name="Region"
+        verbose_name=_("Region")
     )
 
     site = models.ForeignKey(
@@ -210,7 +210,7 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
         related_name="assets",
         blank=True,
         null=True,
-        verbose_name="Site"
+        verbose_name=_("Site")
     )
 
     location = models.ForeignKey(
@@ -219,13 +219,13 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
         related_name="assets",
         blank=True,
         null=True,
-        verbose_name="Location"
+        verbose_name=_("Location")
     )
 
     class Meta:
         ordering = ("-last_updated",)
-        verbose_name = "Asset"
-        verbose_name_plural = "Assets"
+        verbose_name = _("Asset")
+        verbose_name_plural = _("Assets")
 
     def __str__(self):
         return f"{self.name} ({self.code})"
@@ -235,33 +235,26 @@ class Asset(ImageAttachmentsMixin, NetBoxModel):
             "plugins:assets_management_plugin:asset",
             args=[self.pk]
         )
-    
+
     def get_status_color(self):
-        """
-        Return the Bootstrap color associated with the current status.
-        """
         return AssetStatusChoices.COLOR_MAP.get(
             self.status,
             "secondary"
         )
 
     def clean(self):
-        
         super().clean()
 
-      
         if self.site and self.region and self.site.region_id != self.region_id:
             raise ValidationError({
-                "site": "Site does not belong to the selected Region."
+                "site": _("Site does not belong to the selected Region.")
             })
 
-       
         if self.location and self.site and self.location.site_id != self.site_id:
             raise ValidationError({
-                "location": "Location does not belong to the selected Site."
+                "location": _("Location does not belong to the selected Site.")
             })
 
-        
         if self.purchase_date and self.warranty_period_months:
             from dateutil.relativedelta import relativedelta
             self.warranty_expiration_date = (

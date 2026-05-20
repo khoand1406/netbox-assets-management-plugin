@@ -81,6 +81,13 @@ urlpatterns = (
         views.AssetDeleteView.as_view(),
         name="asset_delete"
     ),
+    path(
+    "assets-managements/<int:pk>/attachments/",
+    views.AssetGroupImageView.as_view(),
+    name="assetgroup_attachments"
+),
+    path("assets-managements/assets/<int:pk>/attachments", 
+         views.AssetImageView.as_view(), name="asset_attachments" ),
     path("assets-managements/assets/edit/", views.AssetBulkEditView.as_view(), name="asset_bulk_edit"),
     path("assets-managements/assets/delete/", views.AssetBulkDeleteView.as_view(), name="asset_bulk_delete"),
     path(
@@ -89,6 +96,11 @@ urlpatterns = (
         name="asset_changelog",
         kwargs={"model": models.Asset},
     ),
-    path("assets-managements/<int:pk>/images/", views.AssetGroupImageView.as_view(), name="assetgroup_image-attachments"),
-    path("assets-managements/assets/<int:pk>/images/", views.AssetImageView.as_view(), name="asset_image-attachments")
+    path(
+        "uploaded-files/add/",
+        views.UploadFileFormView.as_view(),
+        name="uploadedfile_add",
+    ),
+    path("assets-managements/save-attachments/", views.save_smartlock_attachments, name="save-attachments"),
+    
 )

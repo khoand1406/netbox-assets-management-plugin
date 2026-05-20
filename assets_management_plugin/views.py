@@ -7,12 +7,18 @@ https://docs.netbox.dev/en/stable/plugins/development/views/
 For generic view classes, see:
 https://docs.netbox.dev/en/stable/development/views/
 """
+import json
 import logging
+import os
+import shutil
+import uuid
 from django.db import transaction, router
 from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ValidationError
+from django.http import JsonResponse, QueryDict
 from extras.models.models import ImageAttachment
 from extras.ui.panels import TagsPanel
+from netbox import settings
 from netbox.views.generic.feature_views import ObjectImageAttachmentsView
 from utilities.exceptions import AbortRequest, PermissionsViolation
 from utilities.forms.utils import restrict_form_fields
@@ -22,22 +28,27 @@ from netbox.views import generic
 from netbox.ui import layout
 from extras.ui.panels import ImageAttachmentsPanel
 from django.contrib.contenttypes.models import ContentType
-from .ui.panels import AssetPanel, AssetsGroupPanel
+from .ui.panels import AssetPanel, AssetsGroupPanel, CustomImageAttachmentsPanel
 from django.shortcuts import redirect, render
 from . import filtersets, forms, models, tables
 from netbox.ui import panels
 from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.utils.html import escape
+from django.utils.translation import gettext_lazy as _
 from .bulk_edit_forms import AssetBulkEditForm, AssetGroupBulkEditForm
 from .bulk_import_forms import AssetCSVForm, AssetGroupCSVForm
+from upload_file_plugin.views import SaveFilesView
+from upload_file_plugin.models import UploadedFile
+from django.views.decorators.http import require_http_methods
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
 
-def get_image_count(obj):
+def get_attachment_count(instance):
     try:
-        # Use object_type_id to match NetBox's internal field schema
-        return ImageAttachment.objects.filter(
-            object_type_id=ContentType.objects.get_for_model(obj).id,
-            object_id=obj.pk
+        return UploadedFile.objects.filter(
+            model_name= instance._meta.model_name,
+            object_id=instance.pk
         ).count()
     except Exception:
         return 0
@@ -53,7 +64,7 @@ class AssetGroupView(GetRelatedModelsMixin, generic.ObjectView):
         ], 
         right_panels=[
             panels.RelatedObjectsPanel(),
-            ImageAttachmentsPanel(),
+            CustomImageAttachmentsPanel(),
         ]
     )
     def get_extra_context(self, request, instance):
@@ -64,33 +75,43 @@ class AssetGroupView(GetRelatedModelsMixin, generic.ObjectView):
                 omit=[],
             )
         }
-@register_model_view(model= models.AssetGroup, name="images", path="images")
-class AssetGroupImageView(ObjectImageAttachmentsView):
+@register_model_view(model= models.AssetGroup, name="attachments", path="attachments")
+class AssetGroupImageView(generic.ObjectView):
     queryset= models.AssetGroup.objects.all()
-    child_model= ImageAttachment
-    template_name = 'generic/object_children.html'
+    template_name = 'assets_management_plugin/asset_group_attachments.html'
     tab = ViewTab(
-        label='Images',
-        badge=get_image_count,
+        label=_('Attachments'),
+        badge=get_attachment_count,
         weight=500
     )
-    def get(self, request, *args, **kwargs):
-        kwargs['model'] = models.AssetGroup
-        return super().get(request, *args, **kwargs)
+    def get_extra_context(self, request, instance):
+        uploaded_files = UploadedFile.objects.filter(
+            model_name=instance._meta.model_name,
+            object_id=instance.pk
+        ).order_by("-created_at")
+
+        return {
+            "uploaded_files": uploaded_files,
+        }
     
-@register_model_view(model= models.Asset, name="images", path="images")
-class AssetImageView(ObjectImageAttachmentsView):
+@register_model_view(model= models.Asset, name="attachments", path="attachments")
+class AssetImageView(generic.ObjectView):
     queryset= models.Asset.objects.all()
-    child_model= ImageAttachment
-    template_name = 'generic/object_children.html'
+    
     tab = ViewTab(
-        label='Images',
-        badge=get_image_count,
+        label=_("Attachments"),
+        badge=get_attachment_count,
         weight=500
     )
-    def get(self, request, *args, **kwargs):
-        kwargs['model'] = models.Asset
-        return super().get(request, *args, **kwargs)
+    def get_extra_context(self, request, instance):
+        uploaded_files = UploadedFile.objects.filter(
+            model_name=instance._meta.model_name,
+            object_id=instance.pk
+        ).order_by("-created_at")
+
+        return {
+            "uploaded_files": uploaded_files,
+        }
     
 class AssetGroupListView(generic.ObjectListView):
     
@@ -130,24 +151,79 @@ class AssetGroupCreateView(generic.ObjectEditView):
                 with transaction.atomic(using=router.db_for_write(model)):
                     object_created = form.instance.pk is None
                     obj = form.save()
-
-                    if not self.queryset.filter(pk=obj.pk).exists():
-                        raise PermissionsViolation()
-
-                
-                    uploaded_file = request.FILES.get('attachment')
-                    if uploaded_file:
+        
+                    all_files = request.POST.get("all_files", "[]")
+        
+                    if all_files and all_files.strip() != "[]":
+                        temp_data = QueryDict(mutable=True)
+                        temp_data.update({
+                            "all_files": all_files,
+                            "model_name": obj._meta.model_name,
+                            "object_id": str(obj.pk)
+                        })
+            
+                        original_data = getattr(request, "_data", None)
+                        request.data = temp_data
+            
                         try:
-                            content_type = ContentType.objects.get_for_model(obj)
-                            image = ImageAttachment(
-                                object_type=content_type,
-                                object_id=obj.pk,
-                                name=uploaded_file.name.rsplit('.', 1)[0],
-                        )
-                            image.image.save(uploaded_file.name, uploaded_file, save=True)
-                            messages.success(request, f"Uploaded File: {uploaded_file.name}")
-                        except Exception as e:
-                            raise ValidationError(f"Error while uploading file: {e}")
+                            save_view = SaveFilesView()
+                            result = save_view.post(request)
+                            result_data = json.loads(result.content)
+                
+                            if not result_data.get("success"):
+                                raise AbortRequest(
+                                f"Failed to save attachments: {result_data.get('errors')}"
+                            )
+                
+                            saved_files = result_data.get("saved_files", [])
+                
+                            for file_info in saved_files:
+                    
+                                file_name = os.path.basename(file_info["path"])
+                    
+                    
+                                old_full = os.path.join(settings.MEDIA_ROOT, file_name)
+                                new_relative = os.path.join("uploads", obj._meta.model_name, file_name)
+                                new_full = os.path.join(settings.MEDIA_ROOT, new_relative)
+                    
+                                os.makedirs(os.path.dirname(new_full), exist_ok=True)
+                    
+                                if os.path.exists(old_full):
+                                    shutil.move(old_full, new_full)
+                                    logger.info(f"Moved file: {old_full} -> {new_full}")
+                                    UploadedFile.objects.filter(
+                                    object_id=obj.pk,
+                                    model_name=obj._meta.model_name,
+                                    file=file_name
+                                ).update(file=new_relative)
+                                    logger.info(f"Updated DB path: {file_name} -> {new_relative}")
+                                else:
+                                    logger.warning(f"File not found after save: {old_full}")
+                
+                        
+                            all_files_list = json.loads(all_files)
+                            allowed_dir = os.path.join(settings.MEDIA_ROOT, 'uploads', 'tmp')
+                
+                            for file_dict in all_files_list:
+                                temp_path = file_dict.get("path", "")
+                                abs_temp_path = os.path.abspath(temp_path)
+                    
+                                if not abs_temp_path.startswith(os.path.abspath(allowed_dir)):
+                                    logger.warning(f"Invalid temp path, skipping: {temp_path}")
+                                    continue
+                    
+                                if os.path.exists(abs_temp_path):
+                                    try:
+                                        os.remove(abs_temp_path)
+                                        logger.info(f"Deleted temp file: {abs_temp_path}")
+                                    except Exception as e:
+                                        logger.error(f"Error deleting temp file {abs_temp_path}: {e}")
+                            
+                        finally:
+                            if original_data is not None:
+                                request.data = original_data
+                            elif hasattr(request, "data"):
+                                del request.data
 
                 
                 msg = '{} {}'.format(
@@ -201,9 +277,6 @@ class AssetGroupCreateView(generic.ObjectEditView):
 
         return render(request, self.template_name, context)
                 
-    
-
-
 class AssetGroupEditView(generic.ObjectEditView):
     queryset = models.AssetGroup.objects.all()
     form = forms.AssetGroupEditForm
@@ -246,47 +319,79 @@ class AssetGroupEditView(generic.ObjectEditView):
                 with transaction.atomic(using=router.db_for_write(model)):
                     object_created = form.instance.pk is None
                     obj = form.save()
-
-                    
-                    if not self.queryset.filter(pk=obj.pk).exists():
-                        raise PermissionsViolation()
-
-               
-                    uploaded_file = request.FILES.get("attachment")
-                    selected_image = form.cleaned_data.get("image_attachment")
-
-                    if uploaded_file:
+        
+                    all_files = request.POST.get("all_files", "[]")
+        
+                    if all_files and all_files.strip() != "[]":
+                        temp_data = QueryDict(mutable=True)
+                        temp_data.update({
+                            "all_files": all_files,
+                            "model_name": obj._meta.model_name,
+                            "object_id": str(obj.pk)
+                        })
+            
+                        original_data = getattr(request, "_data", None)
+                        request.data = temp_data
+            
                         try:
-                            if selected_image:
-                                image = selected_image
-                            else:
-                                content_type = ContentType.objects.get_for_model(obj)
-                                image = ImageAttachment(
-                                    object_type=content_type,
-                                    object_id=obj.pk,
-                                )
-
-                            image.name = uploaded_file.name.rsplit(".", 1)[0]
-
-                            image.image.save(
-                                uploaded_file.name,
-                                uploaded_file,
-                                save=True,
+                            save_view = SaveFilesView()
+                            result = save_view.post(request)
+                            result_data = json.loads(result.content)
+                
+                            if not result_data.get("success"):
+                                raise AbortRequest(
+                                f"Failed to save attachments: {result_data.get('errors')}"
                             )
-
-                            if selected_image:
-                                messages.success(
-                                    request,
-                                    f"Updated File Success: {uploaded_file.name}"
-                                )
-                            else:
-                                messages.success(
-                                    request,
-                                    f"Uploaded New File: {uploaded_file.name}"
-                                )
-
-                        except Exception as e:
-                            raise ValidationError(f"Error while uploading file: {e}")
+                
+                            saved_files = result_data.get("saved_files", [])
+                
+                            for file_info in saved_files:
+                    
+                                file_name = os.path.basename(file_info["path"])
+                    
+                    
+                                old_full = os.path.join(settings.MEDIA_ROOT, file_name)
+                                new_relative = os.path.join("uploads", obj._meta.model_name, file_name)
+                                new_full = os.path.join(settings.MEDIA_ROOT, new_relative)
+                    
+                                os.makedirs(os.path.dirname(new_full), exist_ok=True)
+                    
+                                if os.path.exists(old_full):
+                                    shutil.move(old_full, new_full)
+                                    logger.info(f"Moved file: {old_full} -> {new_full}")
+                                    UploadedFile.objects.filter(
+                                    object_id=obj.pk,
+                                    model_name=obj._meta.model_name,
+                                    file=file_name
+                                ).update(file=new_relative)
+                                    logger.info(f"Updated DB path: {file_name} -> {new_relative}")
+                                else:
+                                    logger.warning(f"File not found after save: {old_full}")
+                
+                        
+                            all_files_list = json.loads(all_files)
+                            allowed_dir = os.path.join(settings.MEDIA_ROOT, 'uploads', 'tmp')
+                
+                            for file_dict in all_files_list:
+                                temp_path = file_dict.get("path", "")
+                                abs_temp_path = os.path.abspath(temp_path)
+                    
+                                if not abs_temp_path.startswith(os.path.abspath(allowed_dir)):
+                                    logger.warning(f"Invalid temp path, skipping: {temp_path}")
+                                    continue
+                    
+                                if os.path.exists(abs_temp_path):
+                                    try:
+                                        os.remove(abs_temp_path)
+                                        logger.info(f"Deleted temp file: {abs_temp_path}")
+                                    except Exception as e:
+                                        logger.error(f"Error deleting temp file {abs_temp_path}: {e}")
+                            
+                        finally:
+                            if original_data is not None:
+                                request.data = original_data
+                            elif hasattr(request, "data"):
+                                del request.data
 
                 
                 msg = "{} {}".format(
@@ -415,7 +520,7 @@ class AssetView(GetRelatedModelsMixin,generic.ObjectView):
         ], 
         right_panels= [
             panels.RelatedObjectsPanel(),
-            ImageAttachmentsPanel()
+            CustomImageAttachmentsPanel()
         ]
     )
     def get_extra_context(self, request, instance):
@@ -461,25 +566,79 @@ class AssetCreateView(generic.ObjectEditView):
                 with transaction.atomic(using=router.db_for_write(model)):
                     object_created = form.instance.pk is None
                     obj = form.save()
-
-                    if not self.queryset.filter(pk=obj.pk).exists():
-                        raise PermissionsViolation()
-
-                
-                    uploaded_file = request.FILES.get('attachment')
-                    if uploaded_file:
+        
+                    all_files = request.POST.get("all_files", "[]")
+        
+                    if all_files and all_files.strip() != "[]":
+                        temp_data = QueryDict(mutable=True)
+                        temp_data.update({
+                            "all_files": all_files,
+                            "model_name": obj._meta.model_name,
+                            "object_id": str(obj.pk)
+                        })
+            
+                        original_data = getattr(request, "_data", None)
+                        request.data = temp_data
+            
                         try:
-                            content_type = ContentType.objects.get_for_model(obj)
-                            image = ImageAttachment(
-                                object_type=content_type,
-                                object_id=obj.pk,
-                                name=uploaded_file.name.rsplit('.', 1)[0],
+                            save_view = SaveFilesView()
+                            result = save_view.post(request)
+                            result_data = json.loads(result.content)
+                
+                            if not result_data.get("success"):
+                                raise AbortRequest(
+                                f"Failed to save attachments: {result_data.get('errors')}"
                             )
-                            image.image.save(uploaded_file.name, uploaded_file, save=True)
-                            messages.success(request, f"Uploaded: {uploaded_file.name}")
-                        except Exception as e:
-                            raise ValidationError(f"Error while uploading file: {e}")
-
+                
+                            saved_files = result_data.get("saved_files", [])
+                
+                            for file_info in saved_files:
+                    
+                                file_name = os.path.basename(file_info["path"])
+                    
+                    
+                                old_full = os.path.join(settings.MEDIA_ROOT, file_name)
+                                new_relative = os.path.join("uploads", obj._meta.model_name, file_name)
+                                new_full = os.path.join(settings.MEDIA_ROOT, new_relative)
+                    
+                                os.makedirs(os.path.dirname(new_full), exist_ok=True)
+                    
+                                if os.path.exists(old_full):
+                                    shutil.move(old_full, new_full)
+                                    logger.info(f"Moved file: {old_full} -> {new_full}")
+                                    UploadedFile.objects.filter(
+                                    object_id=obj.pk,
+                                    model_name=obj._meta.model_name,
+                                    file=file_name
+                                ).update(file=new_relative)
+                                    logger.info(f"Updated DB path: {file_name} -> {new_relative}")
+                                else:
+                                    logger.warning(f"File not found after save: {old_full}")
+                
+                        
+                            all_files_list = json.loads(all_files)
+                            allowed_dir = os.path.join(settings.MEDIA_ROOT, 'uploads', 'tmp')
+                
+                            for file_dict in all_files_list:
+                                temp_path = file_dict.get("path", "")
+                                abs_temp_path = os.path.abspath(temp_path)
+                    
+                                if not abs_temp_path.startswith(os.path.abspath(allowed_dir)):
+                                    logger.warning(f"Invalid temp path, skipping: {temp_path}")
+                                    continue
+                    
+                                if os.path.exists(abs_temp_path):
+                                    try:
+                                        os.remove(abs_temp_path)
+                                        logger.info(f"Deleted temp file: {abs_temp_path}")
+                                    except Exception as e:
+                                        logger.error(f"Error deleting temp file {abs_temp_path}: {e}")
+                            
+                        finally:
+                            if original_data is not None:
+                                request.data = original_data
+                            elif hasattr(request, "data"):
+                                del request.data
                 
                 msg = '{} {}'.format(
                     'Created' if object_created else 'Modified',
@@ -573,44 +732,79 @@ class AssetEditView(generic.ObjectEditView):
                 with transaction.atomic(using=router.db_for_write(model)):
                     object_created = form.instance.pk is None
                     obj = form.save()
-
-                    if not self.queryset.filter(pk=obj.pk).exists():
-                        raise PermissionsViolation()
-
-                    uploaded_file = request.FILES.get("attachment")
-                    selected_image = form.cleaned_data.get("image_attachment")
-
-                    if uploaded_file:
+        
+                    all_files = request.POST.get("all_files", "[]")
+        
+                    if all_files and all_files.strip() != "[]":
+                        temp_data = QueryDict(mutable=True)
+                        temp_data.update({
+                            "all_files": all_files,
+                            "model_name": obj._meta.model_name,
+                            "object_id": str(obj.pk)
+                        })
+            
+                        original_data = getattr(request, "_data", None)
+                        request.data = temp_data
+            
                         try:
-                            if selected_image:
-                                image = selected_image
-                                
-                            else:
-                                content_type = ContentType.objects.get_for_model(obj)
-                                image = ImageAttachment(
-                                    object_type=content_type,
+                            save_view = SaveFilesView()
+                            result = save_view.post(request)
+                            result_data = json.loads(result.content)
+                
+                            if not result_data.get("success"):
+                                raise AbortRequest(
+                                f"Failed to save attachments: {result_data.get('errors')}"
+                            )
+                
+                            saved_files = result_data.get("saved_files", [])
+                
+                            for file_info in saved_files:
+                    
+                                file_name = os.path.basename(file_info["path"])
+                    
+                    
+                                old_full = os.path.join(settings.MEDIA_ROOT, file_name)
+                                new_relative = os.path.join("uploads", obj._meta.model_name, file_name)
+                                new_full = os.path.join(settings.MEDIA_ROOT, new_relative)
+                    
+                                os.makedirs(os.path.dirname(new_full), exist_ok=True)
+                    
+                                if os.path.exists(old_full):
+                                    shutil.move(old_full, new_full)
+                                    logger.info(f"Moved file: {old_full} -> {new_full}")
+                                    UploadedFile.objects.filter(
                                     object_id=obj.pk,
-                            )
-                            image.name = uploaded_file.name.rsplit(".", 1)[0]
-                            image.image.save(
-                                uploaded_file.name,
-                                uploaded_file,
-                                save=True,
-                            )
-                            if selected_image:
-                                messages.success(
-                                request,
-                                f"Updated Image Successfully: {uploaded_file.name}"
-                            )
-                            else:
-                                messages.success(
-                                request,
-                                f"Upload new image successfully: {uploaded_file.name}"
-                            )
-
-                        except Exception as e:
-                            raise ValidationError(f"Error while uploading file: {e}")
-
+                                    model_name=obj._meta.model_name,
+                                    file=file_name
+                                ).update(file=new_relative)
+                                    logger.info(f"Updated DB path: {file_name} -> {new_relative}")
+                                else:
+                                    logger.warning(f"File not found after save: {old_full}")
+                
+                        
+                            all_files_list = json.loads(all_files)
+                            allowed_dir = os.path.join(settings.MEDIA_ROOT, 'uploads', 'tmp')
+                
+                            for file_dict in all_files_list:
+                                temp_path = file_dict.get("path", "")
+                                abs_temp_path = os.path.abspath(temp_path)
+                    
+                                if not abs_temp_path.startswith(os.path.abspath(allowed_dir)):
+                                    logger.warning(f"Invalid temp path, skipping: {temp_path}")
+                                    continue
+                    
+                                if os.path.exists(abs_temp_path):
+                                    try:
+                                        os.remove(abs_temp_path)
+                                        logger.info(f"Deleted temp file: {abs_temp_path}")
+                                    except Exception as e:
+                                        logger.error(f"Error deleting temp file {abs_temp_path}: {e}")
+                            
+                        finally:
+                            if original_data is not None:
+                                request.data = original_data
+                            elif hasattr(request, "data"):
+                                del request.data
                 
                 msg = "{} {}".format(
                     "Created" if object_created else "Modified",
@@ -675,6 +869,15 @@ class AssetEditView(generic.ObjectEditView):
 
         return render(request, self.template_name, context)
     
+class UploadFileFormView(LoginRequiredMixin, TemplateView):
+    template_name = "assets_management_plugin/uploadsmodal.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["object_id"] = self.request.GET.get("object_id")
+        context["model_name"] = self.request.GET.get("model_name")
+        context["return_url"] = self.request.GET.get("return_url")
+        return context
 
 class AssetDeleteView(generic.ObjectDeleteView):
     queryset = models.Asset.objects.all()
@@ -700,4 +903,115 @@ class AssetBulkImportView(generic.BulkImportView):
         obj.save()
         object_form.save_m2m()
         return obj
-    
+
+@require_http_methods(["POST"])
+def save_smartlock_attachments(request):
+    try:
+        all_files_json = request.POST.get("all_files", "[]")
+        model_name = request.POST.get("model_name").lower()
+        object_id = request.POST.get("object_id")
+        if not object_id:
+            return JsonResponse({
+                "success": False,
+                "error": "Missing object_id"
+            }, status=400)
+        try:
+            files= json.loads(all_files_json)
+        except json.JSONDecodeError as e:
+            return JsonResponse({
+                "success": False,
+                "error":"Invalid all_files JSON"
+            }, status= 400)
+        target_dir = os.path.join(settings.MEDIA_ROOT, "uploads", model_name)
+        os.makedirs(target_dir, exist_ok=True)
+
+        saved_files = []
+        errors = []
+        
+        client_file_names = [
+            f.get("file_name")
+            for f in files
+            if f.get("file_name")
+        ]
+        
+        old_files_qs = UploadedFile.objects.filter(
+            model_name=model_name,
+            object_id=object_id
+        )
+
+        files_to_delete = old_files_qs.exclude(
+            file_name__in=client_file_names
+        )
+        
+        for file_obj in files_to_delete:
+            try:
+                if file_obj.file and file_obj.file.path and os.path.exists(file_obj.file.path):
+                    os.remove(file_obj.file.path)
+                file_obj.delete()
+            except Exception as e:
+                errors.append(
+                    f"Failed to delete old file '{file_obj.file_name}': {e}"
+                )
+
+        existing_names = set(
+            UploadedFile.objects.filter(
+                model_name=model_name,
+                object_id=object_id
+            ).values_list("file_name", flat=True)
+        )
+
+        for file_dict in files:
+            file_name = file_dict.get("file_name")
+            temp_path = file_dict.get("path")
+
+            if file_name in existing_names:
+                continue
+            
+            if not temp_path or not os.path.exists(temp_path):
+                continue
+
+            try:
+                
+                base_name, ext = os.path.splitext(file_name)
+                unique_name = f"{base_name}_{uuid.uuid4().hex}{ext}"
+
+                final_path = os.path.join(target_dir, unique_name)
+
+                os.replace(temp_path, final_path)
+
+                relative_path = os.path.join(
+                    "uploads",
+                    model_name,
+                    unique_name
+                ).replace("\\", "/")
+
+                uploaded_file = UploadedFile.objects.create(
+                    file=relative_path,
+                    file_name=file_name,
+                    model_name=model_name,
+                    object_id=object_id,
+                )
+
+                saved_files.append({
+                    "id": uploaded_file.id,
+                    "file_name": uploaded_file.file_name,
+                    "path": uploaded_file.file.url,
+                    "size": uploaded_file.file.size,
+                })
+
+            except Exception as e:
+                errors.append(
+                    f"Failed to save '{file_name}': {e}"
+                )
+
+        return JsonResponse({
+            "success": len(errors) == 0,
+            "saved_files": saved_files,
+            "errors": errors,
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=500)

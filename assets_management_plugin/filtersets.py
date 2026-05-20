@@ -1,37 +1,27 @@
-"""
-Filtersets for NetBox assets-management Plugin.
-
-For more information on NetBox filtersets, see:
-https://docs.netbox.dev/en/stable/plugins/development/filtersets/
-
-For django-filters documentation, see:
-https://django-filter.readthedocs.io/
-"""
-
 import django_filters
 from django.db.models import Q
 from extras.filters import TagFilter
 from dcim.models.sites import Location
+from dcim.models.sites import Region, Site
 from netbox.filtersets import NetBoxModelFilterSet
 from utilities.filtersets import register_filterset
-
-from .models import Asset, AssetGroup, Assetsmanagement
+from django.utils.translation import gettext_lazy as _
+from .models import Asset, AssetGroup
 
 
 @register_filterset
 class AssetGroupFilterSet(NetBoxModelFilterSet):
     name = django_filters.CharFilter(
         lookup_expr="icontains",
-        label="Tên"
+        label=_("Name")
     )
 
     status = django_filters.MultipleChoiceFilter(
         choices=AssetGroup._meta.get_field("status").choices,
-        label="Trạng thái"
+        label=_("Status")
     )
 
-    tag= TagFilter()
-    
+    tag = TagFilter()
 
     class Meta:
         model = AssetGroup
@@ -40,61 +30,81 @@ class AssetGroupFilterSet(NetBoxModelFilterSet):
     def search(self, queryset, name, value):
         if not value or not value.strip():
             return queryset
-
         return queryset.filter(
             Q(name__icontains=value) |
             Q(code__icontains=value) |
             Q(description__icontains=value)
         )
 
+
 @register_filterset
 class AssetFilterSet(NetBoxModelFilterSet):
-    # Free-text search
     q = django_filters.CharFilter(
         method="search",
-        label="Search",
+        label=_("Search"),
     )
 
     name = django_filters.CharFilter(
         lookup_expr="icontains",
-        label="Tên",
+        label=_("Name"),
+    )
+
+    status = django_filters.MultipleChoiceFilter(
+        choices=Asset._meta.get_field("status").choices,
+        label=_("Status"),
+    )
+
+    region = django_filters.ModelChoiceFilter(
+        queryset=Region.objects.all(),
+        label=_("Region"),
+        method="filter_region",
+    )
+
+    site = django_filters.ModelChoiceFilter(
+        queryset=Site.objects.all(),
+        label=_("Site"),
+        field_name="site",
     )
 
     location = django_filters.ModelChoiceFilter(
         queryset=Location.objects.all(),
-        label="Vị trí",
+        label=_("Location"),
+        field_name="location",
     )
 
-    
     asset_group = django_filters.ModelChoiceFilter(
         queryset=AssetGroup.objects.all(),
-        label="Nhóm tài sản",
+        label=_("Asset Group"),
+        field_name="asset_group",
     )
 
-   
     asset_group_id = django_filters.ModelChoiceFilter(
         field_name="asset_group",
         queryset=AssetGroup.objects.all(),
         to_field_name="id",
-        label="Nhóm tài sản",
+        label=_("Asset Group"),
     )
 
     manufacturer = django_filters.CharFilter(
         lookup_expr="icontains",
-        label="Hãng sản xuất",
+        label=_("Manufacturer"),
     )
 
     device_type = django_filters.CharFilter(
         lookup_expr="icontains",
-        label="Loại thiết bị",
+        label=_("Device Type"),
     )
-    tag= TagFilter()
+
+    tag = TagFilter()
 
     class Meta:
         model = Asset
         fields = (
             "q",
             "name",
+            "status",
+            "region",
+            "site",
             "location",
             "asset_group",
             "asset_group_id",
@@ -102,12 +112,10 @@ class AssetFilterSet(NetBoxModelFilterSet):
             "device_type",
             "tag",
         )
-    
 
     def search(self, queryset, name, value):
         if not value or not value.strip():
             return queryset
-
         return queryset.filter(
             Q(name__icontains=value)
             | Q(code__icontains=value)
@@ -115,3 +123,10 @@ class AssetFilterSet(NetBoxModelFilterSet):
             | Q(manufacturer__icontains=value)
             | Q(device_type__icontains=value)
         )
+
+    def filter_region(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                Q(region=value) | Q(site__region=value)
+            )
+        return queryset

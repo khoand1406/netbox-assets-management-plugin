@@ -1,5 +1,5 @@
 from utilities.choices import ChoiceSet
-
+from django.utils.translation import gettext_lazy as _
 
 class AssetsManagemnentChoice(ChoiceSet):
     """
@@ -8,18 +8,15 @@ class AssetsManagemnentChoice(ChoiceSet):
     
     STATUS_ACTIVE = "active"
     STATUS_INACTIVE = "inactive"
-    STATUS_ARCHIVED = "archived"
 
     CHOICES = (
-        (STATUS_ACTIVE, "Active"),
-        (STATUS_INACTIVE, "Inactive"),
-        (STATUS_ARCHIVED, "Archived"),
+        (STATUS_ACTIVE, _("Active")),
+        (STATUS_INACTIVE, _("Inactive")),
     )
 
     COLOR_MAP = {
         STATUS_ACTIVE: "success",
         STATUS_INACTIVE: "warning",
-        STATUS_ARCHIVED: "secondary",
     }
 
 class AssetStatusChoices(ChoiceSet):
@@ -32,10 +29,10 @@ class AssetStatusChoices(ChoiceSet):
     BROKEN = "broken"
 
     CHOICES = [
-        ("active", "Active", "green"),
-        ("standby", "Standby", "blue"),
-        ("maintenance", "Maintenance", "yellow"),
-        ("broken", "Broken", "red"),
+        ("active", _("Active"), "green"),
+        ("standby", _("Standby"), "blue"),
+        ("maintenance", _("Maintenance"), "yellow"),
+        ("broken", _("Broken"), "red"),
     ]
     
     COLOR_MAP = {

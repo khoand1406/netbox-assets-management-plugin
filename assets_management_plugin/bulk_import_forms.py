@@ -16,12 +16,12 @@ class AssetGroupCSVForm(PrimaryModelImportForm):
     status = CSVChoiceField(
         choices=AssetsManagemnentChoice,
         required=False,
-        label="Status"
+        label=_("Status")
     )
 
     excluded_from_visualization = forms.BooleanField(
         required=False,
-        label="Exclude from Visualization",
+        label=_("Exclude from Visualization"),
         help_text=(
             "Accepted values: true/false, yes/no, 1/0."
         ),
@@ -32,7 +32,7 @@ class AssetGroupCSVForm(PrimaryModelImportForm):
         ) | Tag.objects.filter(object_types__isnull=True),  # tag không giới hạn model nào thì vẫn dùng được
         to_field_name="name",
         required=False,
-        label="Tags",
+        label=_("Tags"),
         help_text=_("Comma-separated list of tag names"),
     )
 
@@ -52,28 +52,28 @@ class AssetCSVForm(PrimaryModelImportForm):
         queryset=AssetGroup.objects.all(),
         to_field_name="name",
         required=False,
-        help_text="Enter Asset group name"
+        help_text=_("Enter Asset group name")
         
     )
     region = CSVModelChoiceField(
         queryset=Region.objects.all(),
         to_field_name="name",
         required=False,
-        label="Region"
+        label=_("Region")
     )
 
     site = CSVModelChoiceField(
         queryset=Site.objects.all(),
         to_field_name="name",
         required=False,
-        label="Site"
+        label=_("Site")
     )
 
     location = CSVModelChoiceField(
         queryset=Location.objects.all(),
         to_field_name="name",
         required=False,
-        label="Location"
+        label=_("Location")
     )
 
     # Choice field
@@ -81,7 +81,7 @@ class AssetCSVForm(PrimaryModelImportForm):
         choices=AssetStatusChoices,
         required=False,
         initial=AssetStatusChoices.ACTIVE,
-        label="Status"
+        label=_("Status")
     )
     
     tags = CSVModelMultipleChoiceField(
@@ -90,7 +90,7 @@ class AssetCSVForm(PrimaryModelImportForm):
         ) | Tag.objects.filter(object_types__isnull=True),  # tag không giới hạn model nào thì vẫn dùng được
         to_field_name="name",
         required=False,
-        label="Tags",
+        label=_("Tags"),
         help_text=_("Comma-separated list of tag names"),
     )
 

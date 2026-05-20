@@ -1,0 +1,74 @@
+{% load i18n %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>{{ panel.title|default:_("Attachments") }}</span>
+
+        <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            hx-get="{% url 'plugins:assets_management_plugin:uploadedfile_add' %}?object_id={{ object.pk }}&model_name={{ model_name }}&return_url={{ object.get_absolute_url|urlencode }}"
+            hx-target="#htmx-modal-content"
+            hx-swap="innerHTML"
+            data-bs-toggle="modal"
+            data-bs-target="#htmx-modal"
+        >
+            <i class="mdi mdi-plus-thick"></i>
+            {% trans "Attach an image" %}
+        </button>
+    </div>
+
+    <div class="card-body p-0" id="attachments-panel">
+        {% if uploaded_files %}
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>{% trans "Preview" %}</th>
+                    <th>{% trans "File name" %}</th>
+                    <th>{% trans "Size" %}</th>
+                    <th>{% trans "Uploaded at" %}</th>
+                    <th class="text-end">{% trans "Actions" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in uploaded_files %}
+                <tr>
+                    <td style="width: 80px;">
+                        {% with file.file_name|lower as fname %}
+                            {% if fname|slice:"-4:" == ".jpg" or fname|slice:"-5:" == ".jpeg" or fname|slice:"-4:" == ".png" %}
+                                <a href="{{ file.file.url }}" target="_blank">
+                                    <img src="{{ file.file.url }}"
+                                         style="width:60px; height:60px; object-fit:cover;"
+                                         class="rounded border"
+                                         alt="{{ file.file_name }}">
+                                </a>
+                            {% else %}
+                                <i class="mdi mdi-file-outline" style="font-size: 2rem; color: var(--bs-secondary);"></i>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="align-middle">
+                        <a href="{{ file.file.url }}" target="_blank">{{ file.file_name }}</a>
+                    </td>
+                    <td class="align-middle text-muted small">
+                        {{ file.file.size|filesizeformat }}
+                    </td>
+                    <td class="align-middle text-muted small">
+                        {{ file.created_at|date:"d/m/Y H:i" }}
+                    </td>
+                    <td class="align-middle text-end">
+                        <a href="{{ file.file.url }}"
+                           download="{{ file.file_name }}"
+                           class="btn btn-sm btn-outline-secondary me-1"
+                           title="{% trans "Download" %}">
+                            <i class="mdi mdi-download"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p class="text-muted mb-0 p-3">{% trans "No attachments found." %}</p>
+        {% endif %}
+    </div>
+</div>
