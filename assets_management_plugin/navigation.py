@@ -18,20 +18,18 @@ menu = PluginMenu(
                 PluginMenuItem(
                     link='plugins:assets_management_plugin:assetgroup_list',
                     link_text=_('Assess Groups'),
-                    permissions=['plugins:assets_management_plugin:assetgroup_list'],
                     buttons=(
                         PluginMenuButton(
                             link='plugins:assets_management_plugin:assetgroup_add',
                             title=_('Add Assess Group'),
                             icon_class='mdi mdi-plus-thick',
-                            permissions=['plugins:assets_management_plugin:assetgroup_add'],
+                            permissions=['assets_management_plugin.add_assetgroup'],
                         ),
                     )
                 ),
                 PluginMenuItem(
                     link='plugins:assets_management_plugin:asset_list',
                     link_text=_('Assets'),
-                    permissions=['plugins:assets_management_plugin:asset_list'],
                 ),
             ),
         ),
