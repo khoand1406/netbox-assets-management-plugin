@@ -18,6 +18,7 @@ menu = PluginMenu(
                 PluginMenuItem(
                     link='plugins:assets_management_plugin:assetgroup_list',
                     link_text=_('Assess Groups'),
+                    permissions=['assets_management_plugin.view_assetgroup'],
                     buttons=(
                         PluginMenuButton(
                             link='plugins:assets_management_plugin:assetgroup_add',
@@ -30,6 +31,7 @@ menu = PluginMenu(
                 PluginMenuItem(
                     link='plugins:assets_management_plugin:asset_list',
                     link_text=_('Assets'),
+                    permissions=['assets_management_plugin.view_asset'],
                 ),
             ),
         ),
